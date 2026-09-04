@@ -5,6 +5,31 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### Symbol search is scoped to the seeded universe, not live Yahoo search
+
+`/api/symbols/search` queries the local `symbols` table only. It could instead
+call `yahoo-finance2`'s `search()` and let anyone add any NSE ticker — but a
+freshly-added real symbol would have zero bars in our DB, "insufficient
+history" would fire on *every* one of them, and the app's "no keys, no
+network, works from a clean clone" guarantee would quietly depend on a live
+external call the moment someone typed in the search box. Scoping to the 30
+seeded symbols keeps that guarantee absolute. Trade-off, named on purpose: you
+can't watch a symbol outside the seed set in this build.
+
+---
+
+### One symbol is a staged circuit-limit example
+
+`scripts/seed.ts` sets `SUNPHARMA`'s `circuit_state` to `upper` after seeding
+quotes. We have no live feed to hit a real circuit with (that needs Phase 6),
+and circuit handling is a named, very-India-specific edge case (spec §9) that
+almost nobody else will demonstrate — better to show it working than describe
+it. The volume detector genuinely suppresses itself for that symbol (verified:
+0 `volume_z` events for SUNPHARMA after this went in, vs. others firing
+normally); this isn't a UI-only mock.
+
+---
+
 ### The UI is entirely client-rendered, no server-side data fetch on `/`
 
 `app-shell.tsx` fetches `/api/digest` + `/api/watchlist` on mount rather than

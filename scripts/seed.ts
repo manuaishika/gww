@@ -134,6 +134,17 @@ async function main() {
     });
   console.log(`✓ ${quoteRows.length} quotes (source=seed, as of ${barsFile.sessions.at(-1)})`);
 
+  // Staged example: circuit limits are real and unhandled by most submissions
+  // (spec §9). We have no live feed to hit an actual circuit with, so one
+  // symbol is flagged explicitly — SUNPHARMA is otherwise an ordinary quiet
+  // day in the seed data, chosen so this doesn't collide with a real headline.
+  // The volume detector checks this and suppresses itself (spec §4.3).
+  await db
+    .update(quotesLatest)
+    .set({ circuitState: "upper" })
+    .where(sql`${quotesLatest.symbol} = 'SUNPHARMA'`);
+  console.log("✓ staged circuit-limit example: SUNPHARMA at upper circuit");
+
   await client.end();
   console.log("\n✓ seed complete");
 }

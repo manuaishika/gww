@@ -5,10 +5,11 @@
 A diff engine for your NSE watchlist. It answers one question: **what changed
 since you last looked that actually matters, and why should you care?**
 
-> **Status: Phase 4** — scaffold, schema, a live deploy, ~250 real NSE trading
-> sessions, the detector engine (20 unit tests), the full API, and the UI:
-> digest cards, table view, add/remove, staleness badges, thesis field. Clickable
-> end to end. Edge cases + README polish land in Phase 5. See [`SPEC.md`](./SPEC.md).
+> **Status: Phase 5 — submittable.** Scaffold, schema, a live deploy, ~250 real
+> NSE trading sessions, the detector engine (20 unit tests), the full API, the
+> UI (digest cards, table view, add/remove, staleness badges, thesis field),
+> and all 13 edge cases from `SPEC.md` §9. See [`PITCH.md`](./PITCH.md) for the
+> 100-word pitch and [`DECISIONS.md`](./DECISIONS.md) for the "why."
 >
 > **Fastest way to see it populated:** open the app, click **sync device**,
 > enter `GRW-24X`.
@@ -188,26 +189,33 @@ symbols), not O(users × symbols).
 
 ## Edge cases handled
 
-Target list is `SPEC.md` §9; this table grows as cases are covered.
+All 13 from `SPEC.md` §9, in its order. "Unit tested" means it's one of the
+20 cases in `src/lib/detectors/detectors.test.ts` / `nse-calendar.test.ts`,
+not just asserted in prose.
 
 | Case | Handling |
 |---|---|
-| Delisted / renamed symbol | `TATAMOTORS` demerged in 2025 — kept in `symbols` with `is_active = false` and no bars, as a real example. Fetch returns nothing, no crash. |
-| Splits & bonus issues | All return maths uses `adj_close`. Unit test: a 1:2 split fires no detector (a naive `close` check would see −69%). |
-| Market holidays & weekends | `nse-calendar.json` is the observed set of ^NSEI sessions; horizon is counted in sessions, never calendar days. Unit tested. |
-| Insufficient history | `< 60` sessions → σ₆₀ invalid → `detectSymbol` returns nothing. Unit tested. |
-| Zero-volume / constant-volume session | MAD-based z, guarded against `MAD = 0`. Unit tested. |
-| Circuit limits | `circuit_state` on the quote; the volume detector returns null when it's not `none`. Unit tested. |
-| Very long absence | Horizon `h` clamped to 20 sessions so `√h` doesn't saturate. |
-| Just-added symbol | No baseline — watermark = `added_at`. The digest shows nothing for it until the next session, honestly. |
+| Splits & bonus issues | All return maths uses `adj_close`, never `close`. Unit tested: a 1:2 split fires no detector (a naive `close` check would read a −69% "crash"). |
+| Circuit limits | `circuit_state` on the quote; the volume detector returns null when it isn't `none` (no two-way market → volume is meaningless). Unit tested, and **staged live in the seed**: `SUNPHARMA` is flagged `upper` — its volume detector genuinely produces zero events where every other symbol fires normally. |
+| Insufficient history | `< 60` sessions → σ₆₀ is invalid → `detectSymbol` returns nothing, rather than firing on noise. Unit tested. |
+| Market holidays & weekends | `nse-calendar.json` is the observed set of ^NSEI sessions, not `weekday ≠ 0/6`. Horizon is counted in sessions, never calendar days. Unit tested. |
+| Very long absence | Horizon `h` clamped to 20 sessions so `√h` doesn't saturate and everything reads as significant. The digest card says "showing the last month" once the cap is hit. |
+| Just-added symbol | No baseline — watermark = `added_at`. The digest is honestly empty for it until the next session; the table row says "watching from today." |
 | Concurrent devices | Watermark advance is `GREATEST(existing, incoming)`, not last-write-wins — two devices can't rewind each other. |
-| Empty watchlist vs. quiet watchlist | UI shows two different empty states — "add a symbol" (`no_watchlist`) vs. "quiet, nothing crossed the bar" (`all_quiet`), spec §10. |
-| Disputed / circuit-locked in the table | Amber badge — the palette's *only* use of amber (spec §10) — with the lag, the source, or the circuit state named, never a bare colour. |
-| Delisted row in the table | `TATAMOTORS` renders at 50% opacity with a "delisted" label instead of crashing or silently vanishing. |
-| Duplicate detector runs | Idempotent via `dedupe_key` unique constraint. `npm run detect` twice inserts nothing new. |
-| Delisted / renamed symbol | `TATAMOTORS` demerged in 2025 — kept `is_active = false` with no bars. Fetch returns nothing, no crash. |
-| Stale vs live quotes | Seed quotes stamped at their last session's close with `source = "seed"` — UI shows "as of close", not a fake "live". |
-| No database on a fresh deploy | Landing page is static and pings `/api/health`, which never throws. |
+| Clock skew | `classifyQuote()` rejects an `exchange_ts` in the future and falls back to `fetched_at`, so a misbehaving clock can't fake a "live" badge. |
+| Duplicate cron runs | Idempotent via the `events.dedupe_key` unique constraint — verified by running `npm run detect` twice and diffing the row count (0 new). |
+| Delisted / renamed symbol | `TATAMOTORS` demerged into TMPV/TMCV in 2025 — a real example, not staged. Kept in `symbols` with `is_active = false` and no bars; the table renders it at 50% opacity labelled "delisted" instead of crashing or silently vanishing. |
+| Zero-volume session | Median/MAD volume baseline, guarded against `MAD = 0` (a constant-history-plus-one-spike case that would otherwise divide by zero). Unit tested. |
+| 500-symbol watchlist | The digest caps at 5 headlines regardless of watchlist size — `slice(0, 5)` in `src/lib/digest.ts`, not a UI truncation. The cap is the product, not a limitation (spec §1). |
+| Float precision | `numeric` columns throughout Postgres; prices and returns are strings at the ORM boundary, parsed once in the detector layer. No floats hold money. |
+
+**Beyond the spec's list**, because the product's thesis (§1: "say less") extends to the failure states too:
+
+| Case | Handling |
+|---|---|
+| Empty vs. quiet watchlist | Two different messages — "add a symbol" (`no_watchlist`) vs. "quiet, nothing crossed the bar" (`all_quiet`) — never one generic empty state. |
+| Disputed / stale data | Amber is the palette's *only* use of that colour (spec §10) — always paired with the reason (lag, source, or circuit state), never a bare tint. |
+| No database on a fresh deploy | `/` is static and pings `/api/health`, which never throws — a cold Vercel deploy with no `DATABASE_URL` set still renders instead of 500ing. |
 
 ---
 
@@ -223,4 +231,5 @@ is a stronger signal than hiding them.
 ## Decisions
 
 Non-obvious choices and their rejected alternatives are logged in
-[`DECISIONS.md`](./DECISIONS.md).
+[`DECISIONS.md`](./DECISIONS.md). The submission pitch is
+[`PITCH.md`](./PITCH.md).

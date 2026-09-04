@@ -102,9 +102,9 @@ function Card({
 
       {event.sinceLastSeen && (
         <p className="mt-2 text-[12.5px] text-slate">
-          since you checked ({event.sinceLastSeen.sessions}{" "}
-          {event.sinceLastSeen.sessions === 1 ? "session" : "sessions"}): {pct(event.sinceLastSeen.totalPct)}{" "}
-          total — {pct(event.sinceLastSeen.marketPct)} market, {pct(event.sinceLastSeen.companyPct)} company
+          since you checked ({sinceLabel(event.sinceLastSeen.sessions)}):{" "}
+          {pct(event.sinceLastSeen.totalPct)} total — {pct(event.sinceLastSeen.marketPct)} market,{" "}
+          {pct(event.sinceLastSeen.companyPct)} company
         </p>
       )}
 
@@ -115,6 +115,15 @@ function Card({
       )}
     </article>
   );
+}
+
+// Horizon is capped at 20 sessions (src/lib/detectors/config.ts) so a very
+// long absence doesn't read as one enormous, meaningless move (spec §9).
+const HORIZON_CAP_SESSIONS = 20;
+
+function sinceLabel(sessions: number): string {
+  if (sessions >= HORIZON_CAP_SESSIONS) return "showing the last month";
+  return `${sessions} ${sessions === 1 ? "session" : "sessions"}`;
 }
 
 function QuieterLine({ quieter }: { quieter: Digest["quieter"] }) {

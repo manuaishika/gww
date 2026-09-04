@@ -5,6 +5,12 @@ import { pct, rupees } from "./format";
 import { StalenessPill } from "./staleness-pill";
 import type { WatchlistItem } from "./types";
 
+// No baseline yet — watermark = added_at (spec §9's "just-added symbol").
+// The digest is honestly empty for it until the next session; the table says why.
+function isFreshlyAdded(item: WatchlistItem): boolean {
+  return item.lastSeenAt === item.addedAt;
+}
+
 export function WatchlistTable({
   items,
   onRemove,
@@ -85,6 +91,7 @@ function Row({
         <div className="text-[12px] text-slate">
           {item.name}
           {!item.isActive && " · delisted"}
+          {isFreshlyAdded(item) && " · watching from today"}
         </div>
       </td>
       <td className="px-3 py-2.5 tabular-nums">{rupees(price)}</td>
