@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 
 type Health =
   | { state: "loading" }
-  | { state: "ok"; symbols: number; bars: number; lastSession: string | null }
+  | {
+      state: "ok";
+      symbols: number;
+      bars: number;
+      events: number;
+      lastSession: string | null;
+    }
   | { state: "down"; detail: string };
 
 export function HealthPill() {
@@ -21,6 +27,7 @@ export function HealthPill() {
             state: "ok",
             symbols: d.symbols,
             bars: d.bars,
+            events: d.events ?? 0,
             lastSession: d.lastSession,
           });
         else setHealth({ state: "down", detail: d.detail ?? "unreachable" });
@@ -46,7 +53,7 @@ export function HealthPill() {
       {health.state === "loading" && "checking database…"}
       {health.state === "ok" &&
         (health.bars > 0
-          ? `${health.symbols} symbols · ${health.bars.toLocaleString("en-IN")} daily bars · through ${health.lastSession}`
+          ? `${health.symbols} symbols · ${health.bars.toLocaleString("en-IN")} bars · ${health.events.toLocaleString("en-IN")} events · through ${health.lastSession}`
           : `database connected — ${health.symbols} symbols, no bars (run npm run seed)`)}
       {health.state === "down" && "no database configured — run npm run setup"}
     </span>

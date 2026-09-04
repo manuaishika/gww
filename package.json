@@ -15,7 +15,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "fetch-bars": "node scripts/fetch-bars.mjs",
+    "compute-stats": "tsx scripts/compute-stats.ts",
+    "detect": "tsx scripts/detect.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

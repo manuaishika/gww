@@ -70,6 +70,7 @@ async function main() {
 
   run("npm run db:migrate");
   run("npm run seed");
+  run("npm run detect"); // stats_daily + events, so the digest has something to show
 
   console.log(
     "\n✓ Setup complete.\n  Next:  npm run dev   →   http://localhost:3000\n",
