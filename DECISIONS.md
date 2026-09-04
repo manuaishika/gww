@@ -5,6 +5,52 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### Seed data: real NSE bars, committed as JSON
+
+`scripts/fetch-bars.mjs` pulls ~250 real trading sessions for the 30 equities +
+NIFTY from yahoo-finance2 and writes `src/lib/seed/bars.json` (~670 KB). The
+seed script loads that file — **no network, no keys** on a clean clone. The
+fetch script is committed too, so the provenance of the dataset is auditable and
+anyone can regenerate it. Rejected: a synthetic price generator (less
+defensible, and real data already contains real holidays, real splits via
+`adj_close`, and real volume spikes for the detectors to find); rejected: hitting
+the API at setup time (fails offline, rate-limited, non-deterministic).
+
+---
+
+### yahoo-finance2 v4, not v2
+
+The spec assumed v2; v2 reached end-of-life in 2025. v4 is the maintained line.
+API change: `new YahooFinance()` instead of a default singleton. No other impact.
+
+---
+
+### TATAMOTORS kept in the universe as a delisted example
+
+Tata Motors demerged into TMPV / TMCV in 2025 and the `TATAMOTORS` line stopped
+trading. Rather than quietly dropping it, it stays in `symbols` with
+`is_active = false` and no bars — a real, un-staged instance of the
+delisted/renamed edge case (spec §9). M&M was added to keep 30 active equities.
+
+---
+
+### The session calendar is observed, not computed
+
+`src/lib/seed/nse-calendar.json` is the set of dates ^NSEI actually traded.
+`sessionsBetween()` counts membership in that set. No `weekday !== 0` assumption
+anywhere — NSE has ~14 holidays a year and the odd weekend special session
+(spec §9).
+
+---
+
+### Seeded quotes are stamped "at close", not "live"
+
+Each seed quote's `exchange_ts` is its last session's 15:30 IST close and
+`source = "seed"`. The staleness UI (spec §7) will render "as of close, <date>"
+rather than a fake "live" badge. Honest by construction.
+
+---
+
 ### Product name — deferred
 
 Working title in code and config is "Smart Market Watchlist" (`SPEC.md` uses

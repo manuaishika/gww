@@ -9,6 +9,8 @@ export type SeedSymbol = {
   name: string;
   sector: string;
   listedOn: string; // ISO date
+  isActive?: boolean; // default true; false = delisted/renamed (spec §9)
+  note?: string;
 };
 
 export const NIFTY_SYMBOL = "NIFTY50";
@@ -34,7 +36,15 @@ export const SEED_SYMBOLS: SeedSymbol[] = [
   { symbol: "NTPC", name: "NTPC", sector: "Power", listedOn: "2004-11-05" },
   { symbol: "POWERGRID", name: "Power Grid Corporation", sector: "Power", listedOn: "2007-10-05" },
   { symbol: "ULTRACEMCO", name: "UltraTech Cement", sector: "Materials", listedOn: "2004-08-24" },
-  { symbol: "TATAMOTORS", name: "Tata Motors", sector: "Auto", listedOn: "1998-07-22" },
+  {
+    symbol: "TATAMOTORS",
+    name: "Tata Motors (demerged)",
+    sector: "Auto",
+    listedOn: "1998-07-22",
+    isActive: false,
+    note: "Demerged into TMPV / TMCV in 2025; the TATAMOTORS line no longer trades. Kept as a live example of the delisted/renamed edge case (spec §9) — it stays in a watchlist, renders dimmed, and fires no detectors.",
+  },
+  { symbol: "M&M", name: "Mahindra & Mahindra", sector: "Auto", listedOn: "1995-07-03" },
   { symbol: "TATASTEEL", name: "Tata Steel", sector: "Materials", listedOn: "1995-11-22" },
   { symbol: "WIPRO", name: "Wipro", sector: "IT", listedOn: "1995-11-08" },
   { symbol: "NESTLEIND", name: "Nestle India", sector: "FMCG", listedOn: "2010-01-04" },

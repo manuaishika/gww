@@ -10,14 +10,23 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const startedAt = Date.now();
   try {
-    const rows = await db.execute<{ symbols: number }>(
-      sql`select count(*)::int as symbols from symbols`,
-    );
-    const symbols = rows[0]?.symbols ?? 0;
+    const rows = await db.execute<{
+      symbols: number;
+      bars: number;
+      last_session: string | null;
+    }>(sql`
+      select
+        (select count(*)::int from symbols) as symbols,
+        (select count(*)::int from bars_daily) as bars,
+        (select max(session_date)::text from bars_daily) as last_session
+    `);
+    const r = rows[0];
     return Response.json({
       ok: true,
       db: "connected",
-      symbols,
+      symbols: r?.symbols ?? 0,
+      bars: r?.bars ?? 0,
+      lastSession: r?.last_session ?? null,
       latencyMs: Date.now() - startedAt,
     });
   } catch (err) {

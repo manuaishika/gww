@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type Health =
   | { state: "loading" }
-  | { state: "ok"; symbols: number }
+  | { state: "ok"; symbols: number; bars: number; lastSession: string | null }
   | { state: "down"; detail: string };
 
 export function HealthPill() {
@@ -16,7 +16,13 @@ export function HealthPill() {
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return;
-        if (d.ok) setHealth({ state: "ok", symbols: d.symbols });
+        if (d.ok)
+          setHealth({
+            state: "ok",
+            symbols: d.symbols,
+            bars: d.bars,
+            lastSession: d.lastSession,
+          });
         else setHealth({ state: "down", detail: d.detail ?? "unreachable" });
       })
       .catch((e) => {
@@ -39,9 +45,10 @@ export function HealthPill() {
       <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />
       {health.state === "loading" && "checking database…"}
       {health.state === "ok" &&
-        `database connected — ${health.symbols} symbols seeded`}
-      {health.state === "down" &&
-        "no database configured — run npm run setup"}
+        (health.bars > 0
+          ? `${health.symbols} symbols · ${health.bars.toLocaleString("en-IN")} daily bars · through ${health.lastSession}`
+          : `database connected — ${health.symbols} symbols, no bars (run npm run seed)`)}
+      {health.state === "down" && "no database configured — run npm run setup"}
     </span>
   );
 }

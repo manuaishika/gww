@@ -24,8 +24,9 @@ export default function Home() {
 
       <div className="mt-10 border-t border-ink/10 pt-6">
         <p className="text-[13px] text-slate">
-          <span className="font-medium text-ink">Phase 0.</span> Scaffold live.
-          Seed data, detector engine, and digest UI land in the next phases &mdash;
+          <span className="font-medium text-ink">Phase 1.</span> Real NSE data
+          committed to the repo &mdash; a clean clone has ~250 sessions of daily
+          bars with no API keys. Detector engine and digest UI land next &mdash;
           see{" "}
           <code className="rounded bg-ink/5 px-1 py-0.5 text-[12px]">SPEC.md</code>.
         </p>

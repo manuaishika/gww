@@ -5,8 +5,9 @@
 A diff engine for your NSE watchlist. It answers one question: **what changed
 since you last looked that actually matters, and why should you care?**
 
-> **Status: Phase 0** — scaffold, schema, and a live deploy. Seed data, the
-> detector engine, and the digest UI land in Phases 1–5. See [`SPEC.md`](./SPEC.md).
+> **Status: Phase 1** — scaffold, schema, a live deploy, and ~250 real NSE
+> trading sessions committed to the repo. The detector engine and digest UI
+> land in Phases 2–5. See [`SPEC.md`](./SPEC.md).
 
 **Live:** https://gww-ten.vercel.app
 
@@ -20,12 +21,16 @@ Needs Node 20+ and Docker. **No API keys.**
 git clone https://github.com/manuaishika/gww.git
 cd gww
 npm install
-npm run setup     # starts Postgres, runs migrations, seeds data
+npm run setup     # starts Postgres, runs migrations, seeds ~250 sessions of real NSE data
 npm run dev       # http://localhost:3000
 ```
 
 `npm run setup` also works against a remote database — set `DATABASE_URL` (e.g. a
 free Neon instance) and it skips Docker.
+
+The seed data (`src/lib/seed/bars.json`, ~670 KB) is committed, so the clone has
+real data with **no API keys**. To regenerate it from source:
+`node scripts/fetch-bars.mjs` (uses yahoo-finance2, which needs no key).
 
 ---
 
@@ -94,7 +99,10 @@ _(Populated as they're implemented — target list is `SPEC.md` §9.)_
 
 | Case | Handling |
 |---|---|
-| Delisted / renamed symbol | `symbols.is_active = false`; item stays in the list, renders dimmed, no crash. |
+| Delisted / renamed symbol | `TATAMOTORS` demerged in 2025 — kept in `symbols` with `is_active = false` and no bars, as a real example. Fetch returns nothing, no crash. |
+| Splits & bonus issues | Bars carry both `close` and `adj_close`; all return maths (Phase 2) uses `adj_close`. |
+| Market holidays & weekends | `nse-calendar.json` is the observed set of ^NSEI sessions; `sessionsBetween()` counts membership, never `weekday`. |
+| Stale vs live quotes | Seed quotes are stamped at their last session's close with `source = "seed"` — the UI will show "as of close", not a fake "live". |
 | No database on a fresh deploy | Landing page is static and pings `/api/health`, which never throws. |
 
 ---
