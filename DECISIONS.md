@@ -5,6 +5,39 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### The UI is entirely client-rendered, no server-side data fetch on `/`
+
+`app-shell.tsx` fetches `/api/digest` + `/api/watchlist` on mount rather than
+the page doing an RSC data fetch. Simpler (one data-fetching pattern, not two)
+and correct for this app's actual constraint — the httpOnly session cookie
+means the page can't know who's asking until a request carries it, and this is
+a personal tool behind a cookie, not a page that needs to rank in search.
+Trade-off: a bare loading flash before the digest appears, and no SSR/SEO story.
+Would revisit for a public marketing page, not for this.
+
+---
+
+### Headline % is "since you checked", not "on the day it fired"
+
+`headlinePct()` prefers `sinceLastSeen.totalPct` over the event's own
+`payload.totalPct`. The persisted event describes one session (spec §4's
+baseline is the prior session); the card's big number should answer the
+product's actual question — spec §1's "what changed since you last looked" —
+so it uses the digest's separately-computed since-watermark decomposition
+instead. The why-line underneath still quotes the specific session's move,
+so both numbers are visible and neither contradicts the other.
+
+---
+
+### Card copy composes from the payload with template functions, not JSX ternaries scattered across the component
+
+`card-copy.ts` (`whyLine`, `headlinePct`) is pure and detector-keyed, tested by
+inspection rather than unit tests (no time budget for UI-string tests, and
+`CLAUDE.md` explicitly says not to). Keeping it out of `digest-view.tsx` means
+the copy logic reads as one file instead of four inline branches.
+
+---
+
 ### One event per (symbol, session), not one per detector
 
 Built it the other way first (spec §3's `events.detector` column reads as "one

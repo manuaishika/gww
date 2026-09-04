@@ -5,13 +5,13 @@
 A diff engine for your NSE watchlist. It answers one question: **what changed
 since you last looked that actually matters, and why should you care?**
 
-> **Status: Phase 3** — scaffold, schema, a live deploy, ~250 real NSE trading
-> sessions, the detector engine (20 unit tests), and the read/write API
-> (`/api/digest`, `/api/watchlist`, `/api/seen`, account-code identity). The
-> reading surface (UI) lands in Phase 4. See [`SPEC.md`](./SPEC.md).
+> **Status: Phase 4** — scaffold, schema, a live deploy, ~250 real NSE trading
+> sessions, the detector engine (20 unit tests), the full API, and the UI:
+> digest cards, table view, add/remove, staleness badges, thesis field. Clickable
+> end to end. Edge cases + README polish land in Phase 5. See [`SPEC.md`](./SPEC.md).
 >
-> **Try it without a UI:** `GET /api/session` mints an account,
-> `POST /api/session/adopt {"code":"GRW-24X"}` loads a populated example.
+> **Fastest way to see it populated:** open the app, click **sync device**,
+> enter `GRW-24X`.
 
 **Live:** https://gww-ten.vercel.app
 
@@ -136,6 +136,30 @@ No UI yet — every route below is real and returns JSON.
 
 ---
 
+## The UI
+
+One page, two views. Design follows spec §10 — the argument is *magnitude is
+not meaning*, so the interface doesn't lead with colour:
+
+- **Hero is the time gap** — "You were away 3 days," not a logo or a ticker grid.
+- **No red/green as the primary channel.** Direction is a small ▲/▼ glyph;
+  **size and weight encode materiality** — the top digest card is visibly
+  larger and heavier than #5, which reads almost like a footnote.
+- **Amber is reserved** for stale or disputed data only — nowhere else.
+- **Card copy is templated**, not generated: `card-copy.ts` turns a detector's
+  payload into one sentence (`"+4.1% total — 0.6% was the market, 3.5% was the
+  company."`). No LLM (spec §8, `CLAUDE.md`).
+- **Two empty states, not one** — an empty watchlist says what to do next; a
+  quiet watchlist says nothing crossed the bar. Different messages, spec §10.
+
+`src/components/app/` — `app-shell.tsx` owns data + view state; `digest-view.tsx`,
+`watchlist-table.tsx`, `add-symbol.tsx`, `account-bar.tsx`, `staleness-pill.tsx`
+are presentational. All client-rendered against the API above — there's no
+server-rendered data path yet (a fine trade for a cookie-scoped personal tool;
+see `DECISIONS.md`).
+
+---
+
 ## Architecture
 
 ```
@@ -177,7 +201,9 @@ Target list is `SPEC.md` §9; this table grows as cases are covered.
 | Very long absence | Horizon `h` clamped to 20 sessions so `√h` doesn't saturate. |
 | Just-added symbol | No baseline — watermark = `added_at`. The digest shows nothing for it until the next session, honestly. |
 | Concurrent devices | Watermark advance is `GREATEST(existing, incoming)`, not last-write-wins — two devices can't rewind each other. |
-| Empty watchlist vs. quiet watchlist | Digest distinguishes `no_watchlist` ("add a symbol") from `all_quiet` (watching, nothing crossed a threshold) — different empty states, spec §10. |
+| Empty watchlist vs. quiet watchlist | UI shows two different empty states — "add a symbol" (`no_watchlist`) vs. "quiet, nothing crossed the bar" (`all_quiet`), spec §10. |
+| Disputed / circuit-locked in the table | Amber badge — the palette's *only* use of amber (spec §10) — with the lag, the source, or the circuit state named, never a bare colour. |
+| Delisted row in the table | `TATAMOTORS` renders at 50% opacity with a "delisted" label instead of crashing or silently vanishing. |
 | Duplicate detector runs | Idempotent via `dedupe_key` unique constraint. `npm run detect` twice inserts nothing new. |
 | Delisted / renamed symbol | `TATAMOTORS` demerged in 2025 — kept `is_active = false` with no bars. Fetch returns nothing, no crash. |
 | Stale vs live quotes | Seed quotes stamped at their last session's close with `source = "seed"` — UI shows "as of close", not a fake "live". |
