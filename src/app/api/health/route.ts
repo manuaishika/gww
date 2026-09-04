@@ -33,11 +33,22 @@ export async function GET() {
       latencyMs: Date.now() - startedAt,
     });
   } catch (err) {
+    // drizzle/postgres-js wraps the real error in .cause — surface both so a
+    // misconfigured DATABASE_URL is diagnosable from this endpoint alone.
+    const message = err instanceof Error ? err.message : String(err);
+    const cause =
+      err instanceof Error && err.cause instanceof Error
+        ? err.cause.message
+        : err instanceof Error && err.cause
+          ? String(err.cause)
+          : null;
     return Response.json(
       {
         ok: false,
         db: "unreachable",
-        detail: err instanceof Error ? err.message : String(err),
+        detail: message,
+        cause,
+        hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
       },
       { status: 200 },
     );
