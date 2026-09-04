@@ -5,9 +5,13 @@
 A diff engine for your NSE watchlist. It answers one question: **what changed
 since you last looked that actually matters, and why should you care?**
 
-> **Status: Phase 2** — scaffold, schema, a live deploy, ~250 real NSE trading
-> sessions committed to the repo, and the detector engine (18 unit tests). The
-> digest API and UI land in Phases 3–5. See [`SPEC.md`](./SPEC.md).
+> **Status: Phase 3** — scaffold, schema, a live deploy, ~250 real NSE trading
+> sessions, the detector engine (20 unit tests), and the read/write API
+> (`/api/digest`, `/api/watchlist`, `/api/seen`, account-code identity). The
+> reading surface (UI) lands in Phase 4. See [`SPEC.md`](./SPEC.md).
+>
+> **Try it without a UI:** `GET /api/session` mints an account,
+> `POST /api/session/adopt {"code":"GRW-24X"}` loads a populated example.
 
 **Live:** https://gww-ten.vercel.app
 
@@ -21,9 +25,9 @@ Needs Node 20+ and Docker. **No API keys.**
 git clone https://github.com/manuaishika/gww.git
 cd gww
 npm install
-npm run setup     # Postgres + migrations + seed (~250 sessions of real NSE data) + detectors
+npm run setup     # Postgres + migrations + seed data + detectors + a populated demo account
 npm run dev       # http://localhost:3000
-npm test          # 18 detector / calendar unit tests, no DB needed
+npm test          # 20 detector / calendar unit tests, no DB needed
 ```
 
 `npm run setup` also works against a remote database — set `DATABASE_URL` (e.g. a
@@ -100,6 +104,38 @@ row), and a `(symbol, detector)` pair can't re-fire within 3 sessions unless
 
 ---
 
+## API
+
+No UI yet — every route below is real and returns JSON.
+
+| Route | What |
+|---|---|
+| `GET /api/session` | Who am I? Mints an account + httpOnly cookie on first visit. |
+| `POST /api/session/adopt` | `{ code }` → adopt that account on this device (spec §6). |
+| `GET /api/symbols/search?q=` | Local NSE symbol search. |
+| `GET /api/watchlist` | Items with thesis, watermark, latest quote. |
+| `POST /api/watchlist` | `{ symbol, thesis? }` → add. Watermark = now ("watching from today"). |
+| `PATCH /api/watchlist/:symbol` | Edit thesis / mute. |
+| `DELETE /api/watchlist/:symbol` | Remove. |
+| `POST /api/seen` | `{ eventIds }` \| `{ symbol }` \| `{ all }` → advance the watermark. Never called on page load (spec §5). |
+| `GET /api/digest` | The ranked digest — headlines (≤ 5, with the since-you-last-checked decomposition), a collapsed "N smaller changes", and the away-time header. |
+
+`GET /api/digest` after adopting `GRW-24X`:
+
+```json
+{
+  "awayDays": 36, "awaySessions": 25, "watching": 8,
+  "headlines": [{
+    "symbol": "ADANIENT", "detector": "idio_z", "z": -5.28, "score": 98.9,
+    "thesis": "High-beta proxy for the group. In only for the volatility…",
+    "sinceLastSeen": { "sessions": 25, "totalPct": -4.86, "marketPct": -2.21, "companyPct": -2.70 }
+  }],
+  "quieter": { "count": 78, "symbols": [{ "symbol": "COALINDIA", "count": 14 }] }
+}
+```
+
+---
+
 ## Architecture
 
 ```
@@ -139,6 +175,9 @@ Target list is `SPEC.md` §9; this table grows as cases are covered.
 | Zero-volume / constant-volume session | MAD-based z, guarded against `MAD = 0`. Unit tested. |
 | Circuit limits | `circuit_state` on the quote; the volume detector returns null when it's not `none`. Unit tested. |
 | Very long absence | Horizon `h` clamped to 20 sessions so `√h` doesn't saturate. |
+| Just-added symbol | No baseline — watermark = `added_at`. The digest shows nothing for it until the next session, honestly. |
+| Concurrent devices | Watermark advance is `GREATEST(existing, incoming)`, not last-write-wins — two devices can't rewind each other. |
+| Empty watchlist vs. quiet watchlist | Digest distinguishes `no_watchlist` ("add a symbol") from `all_quiet` (watching, nothing crossed a threshold) — different empty states, spec §10. |
 | Duplicate detector runs | Idempotent via `dedupe_key` unique constraint. `npm run detect` twice inserts nothing new. |
 | Delisted / renamed symbol | `TATAMOTORS` demerged in 2025 — kept `is_active = false` with no bars. Fetch returns nothing, no crash. |
 | Stale vs live quotes | Seed quotes stamped at their last session's close with `source = "seed"` — UI shows "as of close", not a fake "live". |

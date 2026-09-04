@@ -1,44 +1,44 @@
 /**
  * The four detectors (spec §4.1–§4.4) and the engine that runs them.
  *
- * Each detector is pure: (ctx, signals) => DetectorEvent | null. `signals` is
+ * Each detector is pure: (ctx, signals) => DetectorHit | null. `signals` is
  * derived purely from `ctx` (one pass, see signals.ts) and passed in so the
  * work isn't repeated four times. No detector touches the DB or the clock.
+ *
+ * `detectSymbol` composes their output into ONE event per (symbol, session) —
+ * the dominant signal plus every computed fact, so a digest card never needs a
+ * second query to explain itself (spec §8).
  */
 import { CONFIG } from "./config";
 import { dedupeKey } from "./dedupe";
-import { pct, sigmoid } from "./math";
+import { clamp, pct, sigmoid } from "./math";
 import { computeSignals, type Signals } from "./signals";
-import type { DetectContext, DetectorEvent } from "./types";
+import type {
+  DetectContext,
+  DetectorHit,
+  EventSignals,
+  SessionEvent,
+} from "./types";
 
 const hasHistory = (ctx: DetectContext): boolean =>
   ctx.stats.sessionsAvailable >= CONFIG.history.minSessionsForStats;
 
-const round = (n: number, dp: number): number =>
-  Number.parseFloat(n.toFixed(dp));
+const round = (n: number, dp: number): number => Number.parseFloat(n.toFixed(dp));
 
 // ─── 4.1 return z-score ──────────────────────────────────────────────────────
-export function detectReturnZ(
-  ctx: DetectContext,
-  s: Signals,
-): DetectorEvent | null {
+export function detectReturnZ(ctx: DetectContext, s: Signals): DetectorHit | null {
   if (!hasHistory(ctx) || s.zRet == null || s.ret == null) return null;
   if (Math.abs(s.zRet) < CONFIG.returnZ.notable) return null;
 
   return {
-    symbol: ctx.symbol,
     detector: "return_z",
-    sessionDate: ctx.sessionDate,
     z: round(s.zRet, 3),
-    score: 0,
-    dedupeKey: dedupeKey(ctx.symbol, "return_z", ctx.sessionDate, s.zRet),
     payload: {
       returnPct: round(pct(s.ret), 2),
       horizonSessions: round(s.horizon, 2),
       baselineDate: s.baselineDate,
       sigma60: ctx.stats.sigma60,
-      strength:
-        Math.abs(s.zRet) >= CONFIG.returnZ.strong ? "strong" : "notable",
+      strength: Math.abs(s.zRet) >= CONFIG.returnZ.strong ? "strong" : "notable",
     },
   };
 }
@@ -47,17 +47,13 @@ export function detectReturnZ(
 export function detectIdiosyncratic(
   ctx: DetectContext,
   s: Signals,
-): DetectorEvent | null {
+): DetectorHit | null {
   if (!hasHistory(ctx) || s.zIdio == null || s.residual == null) return null;
   if (Math.abs(s.zIdio) < CONFIG.idio.notable) return null;
 
   return {
-    symbol: ctx.symbol,
     detector: "idio_z",
-    sessionDate: ctx.sessionDate,
     z: round(s.zIdio, 3),
-    score: 0,
-    dedupeKey: dedupeKey(ctx.symbol, "idio_z", ctx.sessionDate, s.zIdio),
     payload: {
       totalPct: round(pct(s.ret ?? 0), 2),
       marketPct: round(pct(s.marketLogRet ?? 0), 2),
@@ -71,22 +67,15 @@ export function detectIdiosyncratic(
 }
 
 // ─── 4.3 volume anomaly ─────────────────────────────────────────────────────
-export function detectVolume(
-  ctx: DetectContext,
-  s: Signals,
-): DetectorEvent | null {
+export function detectVolume(ctx: DetectContext, s: Signals): DetectorHit | null {
   // a circuit-locked stock has no two-way market — volume is meaningless (spec §9)
   if (ctx.circuitState !== "none") return null;
   if (!hasHistory(ctx) || s.zVol == null || s.volToday == null) return null;
   if (s.zVol < CONFIG.volume.emitZ) return null;
 
   return {
-    symbol: ctx.symbol,
     detector: "volume_z",
-    sessionDate: ctx.sessionDate,
     z: round(s.zVol, 3),
-    score: 0,
-    dedupeKey: dedupeKey(ctx.symbol, "volume_z", ctx.sessionDate, s.zVol),
     payload: {
       volume: s.volToday,
       medianVolume30: ctx.stats.volMedian30,
@@ -102,7 +91,7 @@ export function detectVolume(
 export function detectStructural(
   ctx: DetectContext,
   s: Signals,
-): DetectorEvent | null {
+): DetectorHit | null {
   if (!hasHistory(ctx) || s.structFlags === 0) return null;
 
   const flags: string[] = [];
@@ -112,15 +101,9 @@ export function detectStructural(
   if (s.maCrossUp) flags.push("ma50_cross_up");
   if (s.maCrossDown) flags.push("ma50_cross_down");
 
-  const z = s.gapZ ?? 0;
   return {
-    symbol: ctx.symbol,
     detector: "structural",
-    sessionDate: ctx.sessionDate,
-    z: round(z, 3),
-    score: 0,
-    // structural events dedupe on the flag set, not |z|
-    dedupeKey: `${ctx.symbol}:structural:${ctx.sessionDate}:${flags.join("+")}`,
+    z: round(s.gapZ ?? 0, 3),
     payload: {
       flags,
       gapZ: s.gapZ == null ? null : round(s.gapZ, 2),
@@ -129,18 +112,6 @@ export function detectStructural(
   };
 }
 
-// ─── scoring (spec §4.7): score = 100 · sigmoid(Σ wᵢ · featureᵢ) ────────────
-function sessionScore(s: Signals): number {
-  const w = CONFIG.score.weights;
-  const sum =
-    w.idio * Math.abs(s.zIdio ?? 0) +
-    w.vol * Math.max(0, (s.zVol ?? 0) - 1) +
-    w.struct * s.structFlags +
-    w.news * 0; // news detector is Phase 7
-  return 100 * sigmoid(sum);
-}
-
-// ─── the engine ─────────────────────────────────────────────────────────────
 export const DETECTORS = [
   detectReturnZ,
   detectIdiosyncratic,
@@ -148,22 +119,76 @@ export const DETECTORS = [
   detectStructural,
 ] as const;
 
-/**
- * Run every detector for one session of one symbol. Pure — returns the events
- * to persist. Dedupe/cooldown against existing rows happens in the engine
- * layer (it needs the DB), keyed on `dedupeKey`.
- */
-export function detectSymbol(ctx: DetectContext): DetectorEvent[] {
-  const signals = computeSignals(ctx);
-  const score = round(sessionScore(signals), 1);
+// ─── scoring (spec §4.7): score = 100 · sigmoid(Σ wᵢ · featureᵢ) ────────────
+function sessionScore(s: Signals): number {
+  const w = CONFIG.score.weights;
+  const volTerm = clamp(
+    Math.max(0, (s.zVol ?? 0) - 1),
+    0,
+    CONFIG.score.volContributionCap,
+  );
+  const sum =
+    w.idio * Math.abs(s.zIdio ?? 0) +
+    w.ret * Math.max(0, Math.abs(s.zRet ?? 0) - CONFIG.returnZ.notable) +
+    w.vol * volTerm +
+    w.struct * s.structFlags +
+    w.news * 0; // news detector is Phase 7
+  return 100 * sigmoid(sum);
+}
 
-  const events: DetectorEvent[] = [];
-  for (const detector of DETECTORS) {
-    const e = detector(ctx, signals);
-    if (e) {
-      e.score = score;
-      events.push(e);
-    }
-  }
-  return events.filter((e) => e.score >= CONFIG.score.minToEmit);
+/** Which fired signal should headline the card. */
+function dominantDetector(hits: DetectorHit[]): DetectorHit {
+  // idiosyncratic is "the one that matters" (spec §4.2) whenever it fired
+  const idio = hits.find((h) => h.detector === "idio_z");
+  if (idio) return idio;
+  return [...hits].sort((a, b) => Math.abs(b.z) - Math.abs(a.z))[0];
+}
+
+/**
+ * Run every detector for one session of one symbol and compose ONE event —
+ * the dominant signal plus every computed fact (spec §8's card needs all of
+ * them, not just the one that happened to cross its threshold).
+ */
+export function detectSymbol(ctx: DetectContext): SessionEvent | null {
+  const signals = computeSignals(ctx);
+
+  const hits = DETECTORS.map((d) => d(ctx, signals)).filter(
+    (h): h is DetectorHit => h !== null,
+  );
+  if (hits.length === 0) return null;
+
+  const score = round(sessionScore(signals), 1);
+  if (score < CONFIG.score.minToEmit) return null;
+
+  const dominant = dominantDetector(hits);
+  const structuralHit = hits.find((h) => h.detector === "structural");
+
+  const eventSignals: EventSignals = {
+    returnZ: signals.zRet == null ? null : round(signals.zRet, 3),
+    returnPct: signals.ret == null ? null : round(pct(signals.ret), 2),
+    idioZ: signals.zIdio == null ? null : round(signals.zIdio, 3),
+    totalPct: signals.ret == null ? null : round(pct(signals.ret), 2),
+    marketPct:
+      signals.marketLogRet == null ? null : round(pct(signals.marketLogRet), 2),
+    companyPct: signals.residual == null ? null : round(pct(signals.residual), 2),
+    beta60: ctx.stats.beta60 == null ? null : round(ctx.stats.beta60, 3),
+    volumeZ: signals.zVol == null ? null : round(signals.zVol, 3),
+    timesMedian:
+      ctx.stats.volMedian30 && ctx.stats.volMedian30 > 0 && signals.volToday != null
+        ? round(signals.volToday / ctx.stats.volMedian30, 1)
+        : null,
+    structural: (structuralHit?.payload.flags as string[]) ?? [],
+    horizonSessions: round(signals.horizon, 2),
+    baselineDate: signals.baselineDate,
+  };
+
+  return {
+    symbol: ctx.symbol,
+    detector: dominant.detector,
+    sessionDate: ctx.sessionDate,
+    z: dominant.z,
+    score,
+    dedupeKey: dedupeKey(ctx.symbol, ctx.sessionDate, dominant.z),
+    signals: eventSignals,
+  };
 }

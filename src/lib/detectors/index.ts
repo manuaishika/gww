@@ -14,7 +14,9 @@ export type {
   Bar,
   CircuitState,
   DetectContext,
-  DetectorEvent,
+  DetectorHit,
   DetectorName,
+  EventSignals,
+  SessionEvent,
   SymbolStats,
 } from "./types";

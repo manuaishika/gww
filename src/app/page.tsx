@@ -24,11 +24,14 @@ export default function Home() {
 
       <div className="mt-10 border-t border-ink/10 pt-6">
         <p className="text-[13px] text-slate">
-          <span className="font-medium text-ink">Phase 1.</span> Real NSE data
-          committed to the repo &mdash; a clean clone has ~250 sessions of daily
-          bars with no API keys. Detector engine and digest UI land next &mdash;
-          see{" "}
-          <code className="rounded bg-ink/5 px-1 py-0.5 text-[12px]">SPEC.md</code>.
+          <span className="font-medium text-ink">Phase 3.</span> The detector
+          engine and digest API are live &mdash; <code className="rounded bg-ink/5 px-1 py-0.5 text-[12px]">GET /api/digest</code>{" "}
+          returns ranked events. The reading surface (spec §5, §10) lands next.
+        </p>
+        <p className="mt-2 text-[13px] text-slate">
+          See a populated example: enter account code{" "}
+          <code className="rounded bg-ink/5 px-1 py-0.5 text-[12px]">GRW-24X</code>{" "}
+          via <code className="rounded bg-ink/5 px-1 py-0.5 text-[12px]">POST /api/session/adopt</code>.
         </p>
         <div className="mt-3">
           <HealthPill />

@@ -137,7 +137,7 @@ describe("computeStats", () => {
     const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.09, finalIndexRet: 0, n: 30 });
     const ctx = buildContext(bars, indexBars);
     expect(ctx.stats.sessionsAvailable).toBeLessThan(60);
-    expect(detectSymbol(ctx)).toEqual([]);
+    expect(detectSymbol(ctx)).toBeNull();
   });
 });
 
@@ -308,20 +308,44 @@ describe("structural detector (spec §4.4)", () => {
   });
 });
 
-describe("detectSymbol scoring", () => {
-  it("produces events with a score in (0, 100] and dedupe keys", () => {
+describe("detectSymbol: one event per (symbol, session)", () => {
+  it("composes a single event carrying every computed signal", () => {
     const { bars, indexBars } = world({ beta: 1.1, finalStockRet: 0.09, finalIndexRet: 0.005 });
     const ctx = buildContext(bars, indexBars);
-    const events = detectSymbol(ctx);
-    expect(events.length).toBeGreaterThan(0);
-    for (const e of events) {
-      expect(e.score).toBeGreaterThan(0);
-      expect(e.score).toBeLessThanOrEqual(100);
-      expect(e.dedupeKey).toContain(e.detector);
-      expect(e.dedupeKey.startsWith("TEST:")).toBe(true);
+    const event = detectSymbol(ctx)!;
+    expect(event).not.toBeNull();
+    expect(event.score).toBeGreaterThan(0);
+    expect(event.score).toBeLessThanOrEqual(100);
+    expect(event.dedupeKey).toBe(`TEST:${ctx.sessionDate}:${Math.floor(Math.abs(event.z))}`);
+    // idio fired here, and it's "the one that matters" — it headlines
+    expect(event.detector).toBe("idio_z");
+    expect(event.signals.idioZ).not.toBeNull();
+    expect(event.signals.returnZ).not.toBeNull();
+    expect(event.signals.companyPct).not.toBeNull();
+
+    // re-running is identical (idempotent key)
+    const again = detectSymbol(ctx)!;
+    expect(again.dedupeKey).toBe(event.dedupeKey);
+  });
+
+  it("scores discriminate across move sizes instead of pinning at 100", () => {
+    const scores = [0.006, 0.015, 0.03, 0.06, 0.12].map((finalStockRet) => {
+      const w = world({ beta: 1, finalStockRet, finalIndexRet: 0 });
+      return detectSymbol(buildContext(w.bars, w.indexBars))?.score ?? null;
+    });
+    const fired = scores.filter((s): s is number => s != null);
+    expect(fired.length).toBeGreaterThan(2);
+    // not every fired event pinned at the ceiling
+    expect(fired.some((s) => s < 99)).toBe(true);
+    // monotonic in move size (never gets LESS material as the move grows)
+    for (let i = 1; i < fired.length; i++) {
+      expect(fired[i]).toBeGreaterThanOrEqual(fired[i - 1]);
     }
-    // re-running is identical (idempotent keys)
-    const again = detectSymbol(ctx);
-    expect(again.map((e) => e.dedupeKey)).toEqual(events.map((e) => e.dedupeKey));
+  });
+
+  it("returns null when nothing crosses a threshold", () => {
+    const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
+    const ctx = buildContext(bars, indexBars);
+    expect(detectSymbol(ctx)).toBeNull();
   });
 });

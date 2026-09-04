@@ -1,27 +1,22 @@
 /**
  * Deduplication and cooldown (spec §4.7). Both are pure.
  *
- * dedupeKey: re-running the detector over the same session produces the same
- * key, so a unique constraint on `events.dedupe_key` makes ingestion
- * idempotent. A real escalation (|z| 2.1 → 3.4) crosses an integer floor and
- * produces a NEW key, so it isn't swallowed.
+ * One event per (symbol, session). dedupeKey: re-running the detector over the
+ * same session produces the same key, so a unique constraint on
+ * `events.dedupe_key` makes ingestion idempotent. A real escalation
+ * (|z| 2.1 → 3.4) crosses an integer floor and produces a NEW key, so it isn't
+ * swallowed.
  */
 import { CONFIG } from "./config";
-import type { DetectorName } from "./types";
 
-export function dedupeKey(
-  symbol: string,
-  detector: DetectorName,
-  sessionDate: string,
-  z: number,
-): string {
-  return `${symbol}:${detector}:${sessionDate}:${Math.floor(Math.abs(z))}`;
+export function dedupeKey(symbol: string, sessionDate: string, z: number): string {
+  return `${symbol}:${sessionDate}:${Math.floor(Math.abs(z))}`;
 }
 
 /**
- * Given the most recent prior event for the same (symbol, detector) that falls
- * WITHIN the cooldown window (the engine selects it using the session
- * calendar), should the new candidate be suppressed?
+ * Given the most recent prior event for the same symbol that falls WITHIN the
+ * cooldown window (the engine selects it using the session calendar), should
+ * the new candidate be suppressed?
  *
  * It escapes the cooldown only if |z| grew by ≥ escalationZ since that prior.
  */

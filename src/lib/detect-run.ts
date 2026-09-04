@@ -22,7 +22,7 @@ import {
   suppressedByCooldown,
   type Bar,
   type CircuitState,
-  type DetectorEvent,
+  type SessionEvent,
 } from "./detectors";
 import { NIFTY_SYMBOL } from "./seed-data";
 
@@ -125,10 +125,10 @@ export async function detectForSymbol(
   const circuitState = await circuitStateOf(symbol);
 
   const firstIdx = Math.max(1, bars.length - lookback);
-  const candidates: DetectorEvent[] = [];
+  const candidates: SessionEvent[] = [];
   for (let i = firstIdx; i < bars.length; i++) {
     const slice = bars.slice(0, i + 1);
-    const events = detectSymbol({
+    const event = detectSymbol({
       symbol,
       sessionDate: bars[i].sessionDate,
       bars: slice,
@@ -137,22 +137,18 @@ export async function detectForSymbol(
       horizonSessions: 1,
       circuitState,
     });
-    candidates.push(...events);
+    if (event) candidates.push(event);
   }
   if (candidates.length === 0) return 0;
 
-  // cooldown: drop a candidate if the same (symbol, detector) fired within the
-  // last `cooldown.sessions` sessions and |z| did not grow enough.
+  // cooldown: drop a candidate if this symbol already fired within the last
+  // `cooldown.sessions` sessions and |z| did not grow enough.
   const earliest = candidates.reduce(
     (min, e) => (e.sessionDate < min ? e.sessionDate : min),
     candidates[0].sessionDate,
   );
   const prior = await db
-    .select({
-      detector: eventsTable.detector,
-      sessionDate: eventsTable.sessionDate,
-      z: eventsTable.z,
-    })
+    .select({ sessionDate: eventsTable.sessionDate, z: eventsTable.z })
     .from(eventsTable)
     .where(and(eq(eventsTable.symbol, symbol), gte(eventsTable.sessionDate, earliest)))
     .orderBy(desc(eventsTable.sessionDate));
@@ -163,7 +159,6 @@ export async function detectForSymbol(
     const ci = sessionIdx.get(c.sessionDate) ?? 0;
     let priorZ: number | null = null;
     for (const p of prior) {
-      if (p.detector !== c.detector) continue;
       const pi = sessionIdx.get(p.sessionDate);
       if (pi == null || pi >= ci) continue;
       if (ci - pi <= CONFIG.cooldown.sessions) {
@@ -184,7 +179,7 @@ export async function detectForSymbol(
         dedupeKey: e.dedupeKey,
         score: e.score.toString(),
         z: e.z.toString(),
-        payload: e.payload,
+        payload: e.signals,
         detectedAt: new Date(),
       })),
     )

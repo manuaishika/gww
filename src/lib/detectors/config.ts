@@ -37,13 +37,21 @@ export const CONFIG = {
     highLowEpsilon: 1e-9, // strict-greater guard for float compares
   },
 
-  /** score = 100 · sigmoid(Σ wᵢ · featureᵢ)  — spec §4.7 */
+  /**
+   * score = 100 · sigmoid(Σ wᵢ · featureᵢ)  — spec §4.7
+   * Weights are calibrated so the sigmoid works in its responsive range: a
+   * lone 2σ idio move ≈ 73, 3σ ≈ 82, 5σ ≈ 92, and co-occurring volume /
+   * structural signals push toward 100. The volume term is capped so one
+   * freak print (z = 30) can't dominate the ranking on its own.
+   */
   score: {
-    weights: { idio: 1.0, vol: 0.35, struct: 0.6, news: 0.5 },
-    minToEmit: 20, // below this an event isn't worth a row
+    weights: { idio: 0.5, ret: 0.28, vol: 0.16, struct: 0.32, news: 0.4 },
+    volContributionCap: 6, // max of (z_vol − 1) that counts
+    minToEmit: 0, // an event that cleared a detector threshold is worth a row
   },
 
-  /** Same (symbol, detector) can't refire within N sessions unless |z| grew. */
+  /** One event per (symbol, session). It can't refire within N sessions unless
+   *  the peak |z| grew by ≥ escalationZ. */
   cooldown: {
     sessions: 3,
     escalationZ: 1.0,

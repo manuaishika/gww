@@ -24,15 +24,41 @@ export type SymbolStats = {
 
 export type DetectorName = "return_z" | "idio_z" | "volume_z" | "structural";
 
-/** A raw detector output. `score` is filled by the scorer, `dedupeKey` by the engine. */
-export type DetectorEvent = {
-  symbol: string;
+/** A single detector's output — used by the per-detector functions and their tests. */
+export type DetectorHit = {
   detector: DetectorName;
-  sessionDate: string;
   z: number; // signed for return/idio; volume z; gap z for structural
-  score: number; // 0–100, set by scoreEvents
-  dedupeKey: string;
   payload: Record<string, unknown>;
+};
+
+/**
+ * What the engine actually persists: ONE row per (symbol, session). `detector`
+ * is the dominant signal; `signals` carries every computed fact so the card can
+ * compose from it without another query (spec §8).
+ */
+export type SessionEvent = {
+  symbol: string;
+  detector: DetectorName; // the dominant signal
+  sessionDate: string;
+  z: number; // the dominant signal's z
+  score: number; // 0–100
+  dedupeKey: string;
+  signals: EventSignals;
+};
+
+export type EventSignals = {
+  returnZ: number | null;
+  returnPct: number | null;
+  idioZ: number | null;
+  totalPct: number | null;
+  marketPct: number | null;
+  companyPct: number | null;
+  beta60: number | null;
+  volumeZ: number | null;
+  timesMedian: number | null;
+  structural: string[];
+  horizonSessions: number;
+  baselineDate: string;
 };
 
 /**
