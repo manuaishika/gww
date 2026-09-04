@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* spec §10 — five values, no gradients */
+  --paper: #fbfbf9;
+  --ink: #141619;
+  --slate: #6b7280;
+  --signal: #1b4f9c;
+  --amber: #b45309; /* stale / disputed data ONLY */
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  /* every figure aligns — spec §10 */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--signal) 18%, transparent);
+}

@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: watchlist_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: watchlist
+      POSTGRES_PASSWORD: watchlist
+      POSTGRES_DB: watchlist
+    ports:
+      - "5432:5432"
+    volumes:
+      - watchlist_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U watchlist -d watchlist"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  watchlist_pgdata:
