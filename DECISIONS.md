@@ -13,6 +13,15 @@ consistent across the repo, README and pitch before submission.
 
 ---
 
+### Deploy: Vercel + Neon, deployed at the start of Phase 0
+
+Live at https://gww-ten.vercel.app from the first commit, per spec §12 rule 1 ("a
+deploy that breaks the night before is the most common way to lose one of
+these"). Neon holds the production database; local reviewers use the committed
+docker-compose Postgres instead and never touch Neon.
+
+---
+
 ### Phase 0 landing page does not depend on the database
 
 The `/` route is static; a client component pings `/api/health`, which catches

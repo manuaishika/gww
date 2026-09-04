@@ -8,7 +8,7 @@ since you last looked that actually matters, and why should you care?**
 > **Status: Phase 0** — scaffold, schema, and a live deploy. Seed data, the
 > detector engine, and the digest UI land in Phases 1–5. See [`SPEC.md`](./SPEC.md).
 
-**Live:** _(URL added once deployed)_
+**Live:** https://gww-ten.vercel.app
 
 ---
 
