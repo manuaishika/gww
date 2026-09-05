@@ -201,13 +201,46 @@ function FirstRun({
       <div className="rounded-md border border-dashed border-ink/15 p-5">
         <p className="text-[14px] font-medium text-ink">Or start your own</p>
         <p className="mt-1 text-[13px] text-slate">
-          Search an NSE symbol and add it. The digest fills in from the next
-          session onward — a just-added symbol has no baseline yet.
+          One click, or search for anything else. The digest fills in from the
+          next session onward — a just-added symbol has no baseline yet.
         </p>
+        <QuickAddChips onAdded={onAdded} />
         <div className="mt-3">
           <AddSymbol onAdded={onAdded} />
         </div>
       </div>
+    </div>
+  );
+}
+
+const QUICK_ADD = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "TITAN"];
+
+function QuickAddChips({ onAdded }: { onAdded: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function add(symbol: string) {
+    setBusy(symbol);
+    try {
+      await api.add(symbol);
+      onAdded();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {QUICK_ADD.map((symbol) => (
+        <button
+          key={symbol}
+          type="button"
+          onClick={() => add(symbol)}
+          disabled={busy !== null}
+          className="rounded-full border border-ink/15 px-2.5 py-1 text-[12px] text-ink transition hover:border-signal hover:text-signal disabled:opacity-40"
+        >
+          {busy === symbol ? "…" : `+ ${symbol}`}
+        </button>
+      ))}
     </div>
   );
 }
