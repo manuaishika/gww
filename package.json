@@ -20,6 +20,7 @@
     "fetch-bars": "node scripts/fetch-bars.mjs",
     "compute-stats": "tsx scripts/compute-stats.ts",
     "detect": "tsx scripts/detect.ts",
+    "tick": "tsx scripts/tick.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

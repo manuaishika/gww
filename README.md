@@ -11,20 +11,20 @@ never needs to know what you paid or hold, only — optionally — how much, so 
 3-sigma move in something you barely own doesn't get lost under one you don't.
 Every headline card carries a chart, not just a number.
 
-> **Status: Phase 5 submittable, plus most of 6–7 and a multi-market pass
-> beyond the original spec.** Scaffold, schema, a live deploy, ~250 real
-> trading sessions across two markets, the detector engine — return z,
-> idiosyncratic z, volume z, structural breaks, news density, silence, and
-> sector-move clustering — with 34 unit tests, the full API, the UI (digest
-> cards with 3 charts, a sparkline table, position-size ranking), all 13 edge
-> cases from `SPEC.md` §9, a real (degrading) second-source integration + data
-> health panel, and several detector examples staged against or found in real
-> computed data. **Not built, on purpose:** LLM narration and broker OAuth —
-> both explicitly rejected, not omitted; see `DECISIONS.md`. See
-> [`PITCH.md`](./PITCH.md) for the pitch, [`DECISIONS.md`](./DECISIONS.md) for
-> the "why," including three real bugs found and fixed along the way (a
-> cooldown gap, a `detected_at` timestamp bug that made "since you last
-> checked" less exact than it looked, and a sector-clustering ordering bug).
+> **Status: the full brief, plus a fair bit past it.** Scaffold, schema, a
+> live deploy, ~250 real trading sessions across two markets, the detector
+> engine (return z, idiosyncratic z, volume z, structural breaks, news
+> density, silence, sector-move clustering) with 38 unit tests, the full API,
+> the UI (digest cards with 3 charts, sparkline table, Discover tab,
+> position-size ranking), all 13 edge cases from `SPEC.md` §9, a real
+> ingest tick (overlap-locked, failure-isolated, Vercel Cron), a degrading
+> second-source integration + data-health panel. **Not built, on purpose:**
+> LLM narration and broker OAuth — both explicitly rejected, not omitted; see
+> `DECISIONS.md`. See [`PITCH.md`](./PITCH.md) for the pitch,
+> [`DECISIONS.md`](./DECISIONS.md) for the "why," including three real bugs
+> found and fixed along the way (a cooldown gap, a `detected_at` timestamp
+> bug that made "since you last checked" less exact than it looked, and a
+> sector-clustering ordering bug).
 >
 > **Fastest way to see it populated:** open the app and click **Load the
 > example** (account code `GRW-24X`) — NSE and US holdings side by side.
@@ -43,7 +43,7 @@ cd gww
 npm install
 npm run setup     # Postgres + migrations + seed data + detectors + a populated demo account
 npm run dev       # http://localhost:3000
-npm test          # 34 detector / calendar / clustering / ranking unit tests, no DB needed
+npm test          # 38 unit tests (detectors, calendar, clustering, ranking, reconcile), no DB needed
 ```
 
 `npm run setup` also works against a remote database — set `DATABASE_URL` (e.g. a
@@ -191,6 +191,7 @@ No UI yet — every route below is real and returns JSON.
 | `POST /api/seen` | `{ eventIds }` \| `{ symbol }` \| `{ all }` → advance the watermark. Never called on page load (spec §5). |
 | `GET /api/digest` | The ranked digest — headlines (≤ 5, with the since-you-last-checked decomposition), a collapsed "N smaller changes", and the away-time header. |
 | `GET /api/data-health` | Global, not per-user: which sources are configured, disputed quotes, circuit-locked symbols (spec §7, optional). |
+| `GET /api/cron/tick` | The ingest tick — polls the union of watched symbols. Guarded by `CRON_SECRET` + `ENABLE_INGEST`; off on the demo, real code (`src/lib/ingest/tick.ts`). |
 
 `GET /api/digest` after adopting `GRW-24X`:
 
@@ -281,17 +282,31 @@ cookie-scoped personal tool; see `DECISIONS.md`).
                    └─────────────────┘
 ```
 
+**The ingest tick** (`src/lib/ingest/tick.ts`, `npm run tick`, wired to Vercel
+Cron via `vercel.json`) is the real thing, not a hand-run script:
+
+- polls the **union of distinct watched symbols** — `selectDistinct` over
+  `watchlist_items`, so poll cost is O(symbols), never O(users × symbols)
+- **per-symbol failure isolation** — a dead ticker or a source timeout is
+  logged and skipped; the run continues and that symbol keeps its
+  last-known-good quote, which ages into "stale" on its own
+- a **Postgres advisory lock** so two overlapping ticks can't collide (the
+  second exits with `skipped`)
+- **idempotent** — `onConflictDoNothing` on bars, `dedupe_key` on events
+- the deployed demo leaves it **off** (`ENABLE_INGEST` unset) so the staged
+  edge-case examples stay stable for a reviewer; it runs live where the flag
+  is set, or locally with `npm run tick`
+
 Detection is **per symbol, shared**. If 10,000 users watch RELIANCE we detect
-once. Per-user cost is one row per watched symbol. Poll cost is O(distinct
-symbols), not O(users × symbols).
+once. Per-user cost is one row per watched symbol.
 
 ---
 
 ## Edge cases handled
 
-All 13 from `SPEC.md` §9, in its order. "Unit tested" means it's one of the
-20 cases in `src/lib/detectors/detectors.test.ts` / `nse-calendar.test.ts`,
-not just asserted in prose.
+All 13 from `SPEC.md` §9, in its order. "Unit tested" means there's an actual
+test for it in `src/lib/**/*.test.ts` (38 cases total), not just a claim in
+prose.
 
 | Case | Handling |
 |---|---|
@@ -317,6 +332,8 @@ not just asserted in prose.
 | Disputed / stale data | Amber is the palette's *only* use of that colour (spec §10) — always paired with the reason (lag, source, or circuit state), never a bare tint. Staged live: `INFY`'s quote is flagged disputed with an honest note (no live second source is configured). |
 | No database on a fresh deploy | `/` is static and pings `/api/health`, which never throws — a cold Vercel deploy with no `DATABASE_URL` set still renders instead of 500ing. |
 | A second source that's usually unavailable | `getFinnhubQuote()` is a real integration (spec §7) but NSE tickers mostly aren't on Finnhub's free tier — it's written to return `null` gracefully, which is the same "one source" path a missing key takes. Never a hard dependency. |
+| The primary source fails mid-ingest | Each symbol's fetch is caught independently — a dead ticker or a yahoo timeout is logged into `failed[]` and the run continues; that symbol keeps its last-known-good quote, which ages into "stale" on its own. Verified by mixing a fake symbol into a real `npm run tick`. |
+| Two ingest ticks overlapping | Postgres advisory lock — the second run exits with `skipped`, so a slow tick can't be lapped. Verified by running two concurrently. |
 | A market with its own calendar | US bars are aligned to `^GSPC`'s own session set, never NSE's — NYSE holidays don't match NSE's, so borrowing the NSE calendar for a US symbol would misalign horizons. Each symbol's own `bars_daily` rows are the source of truth for its horizon; the shared calendar is only used for the header's approximate "away" stat. |
 | A huge position with a trivial move | `positionBonus()` is capped and saturating (max 8 points on a 0–100 scale) — unit tested that a massive position with a barely-emitted event can never outrank a genuine signal in something held lightly. |
 

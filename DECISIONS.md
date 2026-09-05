@@ -5,6 +5,51 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### The ingest tick — one code path, overlap-safe, failure-isolated
+
+`src/lib/ingest/tick.ts` is the backbone under the digest. `runTick()`:
+
+- takes a **Postgres advisory lock** (`pg_try_advisory_lock`) — if a previous
+  run is still going, this one exits with `skipped`, so a slow tick can't be
+  lapped by the next scheduled one. Verified by running two concurrently: one
+  ran, the other skipped cleanly.
+- polls the **union of distinct watched symbols** (+ their benchmarks) —
+  `selectDistinct` over `watchlist_items`, so cost is O(symbols), never
+  O(users × symbols). This is the concrete answer to "how does it scale."
+- **isolates per-symbol failure**: a bogus ticker or a yahoo timeout for one
+  symbol is caught, logged into `failed[]`, and the run continues. That
+  symbol keeps serving its last-known-good quote, which ages into "stale" on
+  its own via `exchange_ts` — no fake "just refreshed" stamp. Verified by
+  mixing a fake symbol into a real run.
+- is **idempotent**: `onConflictDoNothing` on bars, `dedupe_key` on events —
+  re-running inserts nothing new.
+
+`/api/cron/tick` wires it to Vercel Cron (`vercel.json`, weekday close).
+Guarded by `CRON_SECRET` (Vercel sends it) and `ENABLE_INGEST` — the deployed
+demo leaves ingest **off** so its staged edge-case examples (circuit lock,
+disputed quote) stay put for a reviewer; the code is real and runs live in a
+deployment that sets the flag, or locally via `npm run tick`.
+
+---
+
+### Race conditions and integrity, stated plainly
+
+- **Two devices advancing the same watermark**: `GREATEST(existing, incoming)`,
+  not last-write-wins — neither can rewind the other.
+- **Two ingest ticks overlapping**: advisory lock, above.
+- **A digest read during a detection write**: the reader can briefly see a
+  partial event set. Acceptable — events are additive (nothing is deleted
+  mid-run in the incremental path), the digest caps at 5 and re-reads on the
+  next poll, and nothing here is money. A shadow-table-and-swap would remove
+  even that flicker; it's noted, not built, because the cost isn't worth it
+  for a watchlist.
+- **Account minting**: `getOrCreateUser()` runs on every API call and there's
+  no per-IP rate limit — a hostile client could mint many empty users. Each
+  is two tiny rows and no PII; the real fix is a rate limiter at the edge
+  (Vercel / a middleware), out of scope for the submission but named here.
+
+---
+
 ### The digest is never empty of substance the moment you start watching
 
 Real complaint: "my watchlist is there but the digest shows nothing." Correct
