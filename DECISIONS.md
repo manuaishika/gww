@@ -5,6 +5,21 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### The first screen shows real data, not just buttons
+
+The first-run fix (two options: load the demo, or add your own) was still two
+empty-feeling boxes with no actual market content until you clicked one of
+them. `GET /api/trending` (`src/lib/trending.ts`) is a global, un-personalized
+read of the same `events` table the digest reads — the detector engine's
+actual, real, current output across the whole universe, ranked by score, one
+per symbol, no session or watchlist required. Shown above the two boxes with
+a one-click "+ watch" per item. Costs nothing extra: events are already
+shared across every user (the scaling story), so this is the same data, a
+different filter. Directly answers "if I don't pick something it's a blank
+screen" — now the first thing on screen, always, is proof the engine works.
+
+---
+
 ### No broker OAuth — a design conclusion, not a missing feature
 
 Asked directly: "what's the point without logging into Zerodha/Kite?" The

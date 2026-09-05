@@ -7,6 +7,7 @@ import { AddSymbol } from "./add-symbol";
 import { DataHealthPanel } from "./data-health-panel";
 import { DigestView } from "./digest-view";
 import { Hero } from "./hero";
+import { TrendingPreview } from "./trending-preview";
 import { WatchlistTable } from "./watchlist-table";
 import type { Digest, WatchlistItem } from "./types";
 
@@ -187,67 +188,38 @@ function FirstRun({
   onAdded: () => void;
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="rounded-md border border-ink/10 bg-ink/[0.02] p-5">
-        <p className="text-[14px] font-medium text-ink">See it working first</p>
-        <p className="mt-1 text-[13px] text-slate">
-          A populated example — NSE and US stocks side by side, real detector
-          events, charts, theses, one position-sized holding. Account code{" "}
-          <code className="rounded-sm bg-ink/5 px-1 py-0.5">{DEMO_CODE}</code>.
-        </p>
-        <button
-          type="button"
-          onClick={onLoadDemo}
-          disabled={loadingDemo}
-          className="mt-3 rounded-sm bg-signal px-4 py-2 text-[13px] font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
-        >
-          {loadingDemo ? "Loading…" : "Load the example"}
-        </button>
-      </div>
+    <div>
+      <TrendingPreview onAdded={onAdded} />
 
-      <div className="rounded-md border border-dashed border-ink/15 p-5">
-        <p className="text-[14px] font-medium text-ink">Or start your own</p>
-        <p className="mt-1 text-[13px] text-slate">
-          One click, or search for anything else. The digest fills in from the
-          next session onward — a just-added symbol has no baseline yet.
-        </p>
-        <QuickAddChips onAdded={onAdded} />
-        <div className="mt-3">
-          <AddSymbol onAdded={onAdded} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-md border border-ink/10 bg-ink/[0.02] p-5">
+          <p className="text-[14px] font-medium text-ink">See it working first</p>
+          <p className="mt-1 text-[13px] text-slate">
+            A populated example — NSE and US stocks side by side, real detector
+            events, charts, theses, one position-sized holding. Account code{" "}
+            <code className="rounded-sm bg-ink/5 px-1 py-0.5">{DEMO_CODE}</code>.
+          </p>
+          <button
+            type="button"
+            onClick={onLoadDemo}
+            disabled={loadingDemo}
+            className="mt-3 rounded-sm bg-signal px-4 py-2 text-[13px] font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          >
+            {loadingDemo ? "Loading…" : "Load the example"}
+          </button>
+        </div>
+
+        <div className="rounded-md border border-dashed border-ink/15 p-5">
+          <p className="text-[14px] font-medium text-ink">Or search for anything else</p>
+          <p className="mt-1 text-[13px] text-slate">
+            NSE or US. The digest fills in from the next session onward — a
+            just-added symbol has no baseline yet.
+          </p>
+          <div className="mt-3">
+            <AddSymbol onAdded={onAdded} />
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-const QUICK_ADD = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "TITAN"];
-
-function QuickAddChips({ onAdded }: { onAdded: () => void }) {
-  const [busy, setBusy] = useState<string | null>(null);
-
-  async function add(symbol: string) {
-    setBusy(symbol);
-    try {
-      await api.add(symbol);
-      onAdded();
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-1.5">
-      {QUICK_ADD.map((symbol) => (
-        <button
-          key={symbol}
-          type="button"
-          onClick={() => add(symbol)}
-          disabled={busy !== null}
-          className="rounded-full border border-ink/15 px-2.5 py-1 text-[12px] text-ink transition hover:border-signal hover:text-signal disabled:opacity-40"
-        >
-          {busy === symbol ? "…" : `+ ${symbol}`}
-        </button>
-      ))}
     </div>
   );
 }

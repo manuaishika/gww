@@ -97,6 +97,18 @@ export type DataHealth = {
   circuitLocked: { symbol: string; name: string; state: string }[];
 };
 
+export type TrendingItem = {
+  symbol: string;
+  name: string;
+  currency: string;
+  sector: string | null;
+  detector: "return_z" | "idio_z" | "volume_z" | "structural" | "news_density" | "silence";
+  sessionDate: string;
+  z: number;
+  score: number;
+  payload: EventSignals;
+};
+
 export type SymbolResult = {
   symbol: string;
   name: string;

@@ -182,6 +182,7 @@ No UI yet — every route below is real and returns JSON.
 | `GET /api/session` | Who am I? Mints an account + httpOnly cookie on first visit. |
 | `POST /api/session/adopt` | `{ code }` → adopt that account on this device (spec §6). |
 | `GET /api/symbols/search?q=` | Local symbol search across every seeded market. |
+| `GET /api/trending` | Global, no session needed: what the detector actually found recently, across everyone's shared symbols. What a brand-new visitor sees first. |
 | `GET /api/watchlist` | Items with thesis, position size, watermark, latest quote, currency, sparkline. |
 | `POST /api/watchlist` | `{ symbol, thesis?, positionSize? }` → add. Watermark = now ("watching from today"). |
 | `PATCH /api/watchlist/:symbol` | Edit thesis / mute / position size. |
@@ -226,9 +227,12 @@ not meaning*, so the interface doesn't lead with colour:
   company."`). No LLM (spec §8, `CLAUDE.md`).
 - **Two empty states, not one** — an empty watchlist says what to do next; a
   quiet watchlist says nothing crossed the bar. Different messages, spec §10.
-- **First run is a real choice, not a blank page** — a brand-new visitor sees
-  "load the example" and "add your own first symbol," side by side, not an
-  empty digest and a search box you have to go hunting for.
+- **First run shows real data, not just buttons** — `GET /api/trending`
+  (`src/lib/trending.ts`) surfaces the detector engine's own recent output
+  across the whole universe, un-personalized, no session required, with a
+  one-click "+ watch" per item — above "load the example" and "add your own,"
+  side by side. Not a blank page, not a page that only describes what the
+  product would show you if you did something first.
 - **Four cheap charts, hand-rolled SVG, no charting library** (spec addendum —
   deviates from the original Recharts-for-sparklines decision; see
   `DECISIONS.md` for why). Every headline card, collapsed behind a "show
