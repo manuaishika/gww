@@ -23,7 +23,7 @@ function ev(
 describe("clusterSectorMoves", () => {
   it("groups the real IT-sector example found in the seed data (2026-02-12)", () => {
     // TCS, INFY, WIPRO, HCLTECH all fired idio_z the same real session —
-    // genuine data, not fabricated (see DECISIONS.md).
+    // genuine data, not fabricated.
     const events = [
       ev("tcs1", "TCS", "2026-02-12", 94.2),
       ev("infy1", "INFY", "2026-02-12", 94.6),

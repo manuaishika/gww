@@ -4,7 +4,7 @@
  *
  * There is no live news feed wired up — adding one needs an API key, which
  * would break the "no keys, works from a clean clone" guarantee the moment
- * anyone searched for a symbol (see DECISIONS.md). This is structured event
+ * anyone searched for a symbol. This is structured event
  * DATES only (no scraped headline text), deterministic from the symbol name
  * so it's reproducible, plus two examples engineered against the REAL price
  * series (src/lib/seed/bars.json) to demonstrate the news-density and
@@ -45,7 +45,7 @@ function build(): NewsRow[] {
   }
 
   // Staged, on purpose, against real dates checked against the real price
-  // series (see DECISIONS.md):
+  // series:
   events.push(
     // NESTLEIND's idiosyncratic move on 2026-08-27 was ~0.002σ — about as
     // quiet as this dataset gets. A "results" date a week earlier makes the

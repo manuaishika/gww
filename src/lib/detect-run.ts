@@ -35,7 +35,7 @@ import {
 // session it's actually from, and a watermark set to any date before the
 // backfill ran would (wrongly) surface the entire history as new. Found
 // while testing the sector-cluster feature against a real event from months
-// back — see DECISIONS.md.
+// back.
 const sessionCloseTs = (sessionDate: string, currency: string) =>
   new Date(`${sessionDate}T${currency === "USD" ? "20:00:00" : "10:00:00"}.000Z`);
 

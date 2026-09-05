@@ -40,7 +40,7 @@ export const CONFIG = {
   /**
    * News density (§4.5) and silence (§4.6) — optional, Phase 7. There's no
    * live news feed wired up (would need a key); these read from a small
-   * seeded results calendar. See DECISIONS.md.
+   * committed, clearly-illustrative results calendar.
    */
   news: {
     densityWindowDays: 7, // count events in the trailing week

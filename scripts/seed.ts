@@ -204,7 +204,7 @@ async function main() {
       })),
     );
   }
-  console.log(`✓ ${newsFile.events.length} news/results events (illustrative — see DECISIONS.md)`);
+  console.log(`✓ ${newsFile.events.length} news/results events (illustrative)`);
 
   await client.end();
   console.log("\n✓ seed complete");

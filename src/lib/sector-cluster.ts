@@ -8,7 +8,7 @@
  * the model can't separate from true company-specific news. Real example
  * found in the seed data: TCS, INFY, WIPRO, HCLTECH all fired idio_z on
  * 2026-02-12 — a same-day, same-sector quadruple that's obviously one story,
- * not four (see DECISIONS.md).
+ * not four.
  */
 
 export type ClusterableEvent = {

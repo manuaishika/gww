@@ -182,8 +182,8 @@ export async function buildDigest(
 
   // sector clustering — an honest correction for a one-factor model. Pure
   // logic lives in sector-cluster.ts (unit tested there); this just wires it
-  // to the watchlist's sectors. See DECISIONS.md for a real example found in
-  // the seed data.
+  // to the watchlist's sectors. Real unstaged example in the seed:
+  // TCS/INFY/WIPRO/HCLTECH all fired idio_z on 2026-02-12.
   const { clusterByRepresentativeId, suppressedEventIds } = clusterSectorMoves(
     inWindow.map((e) => ({
       id: e.id,
