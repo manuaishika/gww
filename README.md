@@ -2,24 +2,32 @@
 
 *Working title — final name TBD.*
 
-A diff engine for your NSE watchlist. It answers one question: **what changed
-since you last looked that actually matters, and why should you care?**
+A diff engine for your watchlist, NSE or otherwise. It answers one question:
+**what changed since you last looked that actually matters, and why should
+you care?** Every stock regresses against its own market's benchmark — NIFTY
+for NSE, the S&P 500 for US names — with no currency conversion, because a
+z-score doesn't need one. There's no broker login anywhere in this app: it
+never needs to know what you paid or hold, only — optionally — how much, so a
+3-sigma move in something you barely own doesn't get lost under one you don't.
+Every headline card carries a chart, not just a number.
 
-> **Status: Phase 5 submittable, plus most of 6–7.** Scaffold, schema, a live
-> deploy, ~250 real NSE trading sessions, the detector engine — return z,
+> **Status: Phase 5 submittable, plus most of 6–7 and a multi-market pass
+> beyond the original spec.** Scaffold, schema, a live deploy, ~250 real
+> trading sessions across two markets, the detector engine — return z,
 > idiosyncratic z, volume z, structural breaks, news density, silence, and
-> sector-move clustering — with 30 unit tests, the full API, the UI, all 13
-> edge cases from `SPEC.md` §9, a real (degrading) second-source integration +
-> data health panel, and several detector examples staged against or found in
-> real computed data. **Not built, on purpose:** LLM narration — `CLAUDE.md`
-> bans it outright; see `DECISIONS.md`. See [`PITCH.md`](./PITCH.md) for the
-> pitch, [`DECISIONS.md`](./DECISIONS.md) for the "why," including two real
-> bugs found and fixed along the way (a cooldown gap, and a `detected_at`
-> timestamp bug in the backfill that made "since you last checked" less exact
-> than it looked).
+> sector-move clustering — with 34 unit tests, the full API, the UI (digest
+> cards with 3 charts, a sparkline table, position-size ranking), all 13 edge
+> cases from `SPEC.md` §9, a real (degrading) second-source integration + data
+> health panel, and several detector examples staged against or found in real
+> computed data. **Not built, on purpose:** LLM narration and broker OAuth —
+> both explicitly rejected, not omitted; see `DECISIONS.md`. See
+> [`PITCH.md`](./PITCH.md) for the pitch, [`DECISIONS.md`](./DECISIONS.md) for
+> the "why," including three real bugs found and fixed along the way (a
+> cooldown gap, a `detected_at` timestamp bug that made "since you last
+> checked" less exact than it looked, and a sector-clustering ordering bug).
 >
 > **Fastest way to see it populated:** open the app and click **Load the
-> example** (account code `GRW-24X`).
+> example** (account code `GRW-24X`) — NSE and US holdings side by side.
 
 **Live:** https://gww-ten.vercel.app
 
@@ -35,18 +43,19 @@ cd gww
 npm install
 npm run setup     # Postgres + migrations + seed data + detectors + a populated demo account
 npm run dev       # http://localhost:3000
-npm test          # 30 detector / calendar / clustering unit tests, no DB needed
+npm test          # 34 detector / calendar / clustering / ranking unit tests, no DB needed
 ```
 
 `npm run setup` also works against a remote database — set `DATABASE_URL` (e.g. a
 free Neon instance) and it skips Docker.
 
-The seed data (`src/lib/seed/bars.json`, ~670 KB, and `news.json`) is committed,
-so the clone has real data with **no API keys**. Regenerate from source:
-`node scripts/fetch-bars.mjs` (uses yahoo-finance2) and
-`npx tsx scripts/generate-news.ts`. An optional `FINNHUB_API_KEY` (see
-`.env.example`) enables a real second price source — the app is fully
-functional without it.
+The seed data (`src/lib/seed/bars.json`, ~740 KB, and `news.json`) is
+committed — 30 NSE stocks + NIFTY, 3 US stocks + the S&P 500, each aligned to
+its own market's calendar — so the clone has real data across two markets with
+**no API keys**. Regenerate from source: `node scripts/fetch-bars.mjs` (uses
+yahoo-finance2) and `npx tsx scripts/generate-news.ts`. An optional
+`FINNHUB_API_KEY` (see `.env.example`) enables a real second price source —
+the app is fully functional without it.
 
 ---
 
@@ -89,13 +98,15 @@ many standard deviations is this move, *for this stock*, over *this many* days.
 **2. Idiosyncratic move — the one we rank on** (§4.2)
 
 ```
-β₆₀      = cov(r_stock, r_nifty) / var(r_nifty)      over 60 sessions
-residual = r_stock − β₆₀ · r_nifty
+β₆₀      = cov(r_stock, r_benchmark) / var(r_benchmark)      over 60 sessions
+residual = r_stock − β₆₀ · r_benchmark
 z_idio   = residual / (residσ₆₀ · √h)
 ```
 
-A stock that rose because NIFTY rose is not news about the company. We subtract
-`β₆₀ · r_nifty` and z-score what's left. The card shows the split:
+`r_benchmark` is NIFTY for an NSE stock, the S&P 500 for a US one — whatever
+`symbols.benchmark_symbol` says (multi-market, below). A stock that rose
+because its market rose is not news about the company. We subtract
+`β₆₀ · r_benchmark` and z-score what's left. The card shows the split:
 `+4.1% total — 1.0% market, 3.0% company`. (Seed betas come out textbook-correct:
 BAJFINANCE ≈ 1.6, DRREDDY ≈ 0.3, COALINDIA ≈ 0.)
 
@@ -141,6 +152,25 @@ collapses a cluster like that into one card ("moved with 3 other IT holdings —
 likely sector-wide, not company-specific") instead of letting one sector event
 occupy 3 of the 5 headline slots. Pure, unit tested against that exact event.
 
+**Multi-market** — `currency`, `exchange`, `timezone` and `benchmark_symbol`
+are columns on `symbols`, not global constants (`src/lib/db/schema.ts`). An
+NSE stock's `beta_60`/`resid_sigma_60` come from regressing against NIFTY;
+`AAPL`/`MSFT`/`GOOGL` regress against the S&P 500 (`SPX500` in the seed,
+real Yahoo data, its own trading calendar — NYSE holidays don't line up with
+NSE's, so US bars are aligned to `^GSPC`'s own session set, never NSE's).
+**No currency conversion, anywhere** — a z-score is unitless, so an AAPL move
+and a RELIANCE move compare on materiality with no FX rate involved. Only the
+raw-price display needs to know the symbol's currency (`$` vs `₹`).
+
+**Position size** (`src/lib/position-weight.ts`) — one optional number per
+watchlist item (shares/units — no valuation, no broker link). It adds a small,
+*bounded and saturating* bonus to score at digest time: `100 · position /
+(position + 100)`th of 8 points, capped so a huge position with a trivial move
+can never outrank a real signal in something you barely hold — verified in
+the unit tests (`effectiveScore(21, 1_000_000) < effectiveScore(95, 1)`,
+always). It never touches the shared `events.score` column — detection stays
+per-symbol and shared; only this user's ranking preference is personal.
+
 ---
 
 ## API
@@ -151,10 +181,10 @@ No UI yet — every route below is real and returns JSON.
 |---|---|
 | `GET /api/session` | Who am I? Mints an account + httpOnly cookie on first visit. |
 | `POST /api/session/adopt` | `{ code }` → adopt that account on this device (spec §6). |
-| `GET /api/symbols/search?q=` | Local NSE symbol search. |
-| `GET /api/watchlist` | Items with thesis, watermark, latest quote. |
-| `POST /api/watchlist` | `{ symbol, thesis? }` → add. Watermark = now ("watching from today"). |
-| `PATCH /api/watchlist/:symbol` | Edit thesis / mute. |
+| `GET /api/symbols/search?q=` | Local symbol search across every seeded market. |
+| `GET /api/watchlist` | Items with thesis, position size, watermark, latest quote, currency, sparkline. |
+| `POST /api/watchlist` | `{ symbol, thesis?, positionSize? }` → add. Watermark = now ("watching from today"). |
+| `PATCH /api/watchlist/:symbol` | Edit thesis / mute / position size. |
 | `DELETE /api/watchlist/:symbol` | Remove. |
 | `POST /api/seen` | `{ eventIds }` \| `{ symbol }` \| `{ all }` → advance the watermark. Never called on page load (spec §5). |
 | `GET /api/digest` | The ranked digest — headlines (≤ 5, with the since-you-last-checked decomposition), a collapsed "N smaller changes", and the away-time header. |
@@ -164,15 +194,20 @@ No UI yet — every route below is real and returns JSON.
 
 ```json
 {
-  "awayDays": 36, "awaySessions": 25, "watching": 10,
+  "awayDays": 35, "awaySessions": 25, "watching": 12,
   "headlines": [{
-    "symbol": "ADANIENT", "detector": "idio_z", "z": -5.28, "score": 98.9,
-    "thesis": "High-beta proxy for the group. In only for the volatility…",
-    "sinceLastSeen": { "sessions": 25, "totalPct": -4.86, "marketPct": -2.21, "companyPct": -2.70 }
+    "symbol": "TITAN", "detector": "idio_z", "z": 2.84, "score": 95, "currency": "INR",
+    "positionSize": 400, "positionBonus": 6.4,
+    "thesis": "Discretionary bellwether — reads through to urban demand.",
+    "sinceLastSeen": { "sessions": 25, "totalPct": 3.11, "marketPct": -1.67, "companyPct": 4.87 },
+    "chart": { "closes": [ /* 60 sessions */ ], "zHistory": [ /* 59 daily z's */ ], "watermarkDate": "2026-08-03" }
   }],
-  "quieter": { "count": 19, "symbols": [{ "symbol": "COALINDIA", "count": 4 }] }
+  "quieter": { "count": 22, "symbols": [{ "symbol": "COALINDIA", "count": 4 }] }
 }
 ```
+
+Note `AAPL`/`MSFT` also sit in this watchlist with `currency: "USD"` — same
+shape, same digest, different market, no conversion anywhere.
 
 ---
 
@@ -194,9 +229,22 @@ not meaning*, so the interface doesn't lead with colour:
 - **First run is a real choice, not a blank page** — a brand-new visitor sees
   "load the example" and "add your own first symbol," side by side, not an
   empty digest and a search box you have to go hunting for.
+- **Four cheap charts, hand-rolled SVG, no charting library** (spec addendum —
+  deviates from the original Recharts-for-sparklines decision; see
+  `DECISIONS.md` for why). Every headline card, collapsed behind a "show
+  chart" toggle so 5 cards don't turn into a wall of charts:
+  - **Absence chart** — the last 60 sessions' price, with the window since you
+    last checked shaded. You see the gap you missed, not a number describing it.
+  - **Decomposition bar** — the move split into market and company portions,
+    as two bars on a shared scale. The thesis, as a picture.
+  - **Z-context strip** — this move plotted against the stock's own last ~60
+    daily moves; the outlier is visible, not asserted.
+  - **Sparkline** in the table, one per row, batched in the same query as
+    everything else — no per-row round trip.
 
 `src/components/app/` — `app-shell.tsx` owns data + view state; `digest-view.tsx`,
 `watchlist-table.tsx`, `add-symbol.tsx`, `account-bar.tsx`, `staleness-pill.tsx`,
+`sparkline.tsx`, `absence-chart.tsx`, `decomposition-bar.tsx`, `z-context-strip.tsx`,
 `data-health-panel.tsx` (collapsed by default — for someone who goes looking,
 not competing with the digest) are presentational. All client-rendered against
 the API above — there's no server-rendered data path yet (a fine trade for a
@@ -260,19 +308,31 @@ not just asserted in prose.
 | Disputed / stale data | Amber is the palette's *only* use of that colour (spec §10) — always paired with the reason (lag, source, or circuit state), never a bare tint. Staged live: `INFY`'s quote is flagged disputed with an honest note (no live second source is configured). |
 | No database on a fresh deploy | `/` is static and pings `/api/health`, which never throws — a cold Vercel deploy with no `DATABASE_URL` set still renders instead of 500ing. |
 | A second source that's usually unavailable | `getFinnhubQuote()` is a real integration (spec §7) but NSE tickers mostly aren't on Finnhub's free tier — it's written to return `null` gracefully, which is the same "one source" path a missing key takes. Never a hard dependency. |
+| A market with its own calendar | US bars are aligned to `^GSPC`'s own session set, never NSE's — NYSE holidays don't match NSE's, so borrowing the NSE calendar for a US symbol would misalign horizons. Each symbol's own `bars_daily` rows are the source of truth for its horizon; the shared calendar is only used for the header's approximate "away" stat. |
+| A huge position with a trivial move | `positionBonus()` is capped and saturating (max 8 points on a 0–100 scale) — unit tested that a massive position with a barely-emitted event can never outrank a genuine signal in something held lightly. |
 
 ---
 
 ## What this deliberately doesn't do
 
-Websockets, OAuth, portfolio P&L, options, backtesting, full-page charts, push
-notifications, multiple watchlists. Identity is a 6-character account code, not an
-auth provider. Real-time is polling with a visible "last updated". **LLM
-narration** is explicitly out — `CLAUDE.md` bans it, on the reasoning that every
-number on a card must trace back to the detector engine with nothing in
-between that could hallucinate a percentage; template-composed copy
-(`card-copy.ts`) is the whole narration layer, permanently. Naming the cuts is
-a stronger signal than hiding them.
+Websockets, portfolio P&L, options, backtesting, full-page charts (the 4 cheap
+ones above, not a trading terminal), push notifications, multiple watchlists.
+
+**No broker OAuth, no Zerodha/Kite login, ever.** Identity is a 6-character
+account code, not an auth provider — full stop, not "not yet." The product
+never needs to know what you paid, what you hold at cost, or your account
+value; the only broker-adjacent fact it uses is an optional position size
+(shares/units, typed in, no credentials), and only to nudge ranking, bounded
+so it can never override a real signal. A watchlist app that asked for
+brokerage credentials to tell you a stock moved would be asking for more
+trust than the job requires.
+
+Real-time is polling with a visible "last updated". **LLM narration** is
+explicitly out — `CLAUDE.md` bans it, on the reasoning that every number on a
+card must trace back to the detector engine with nothing in between that could
+hallucinate a percentage; template-composed copy (`card-copy.ts`) is the whole
+narration layer, permanently. Naming the cuts is a stronger signal than hiding
+them.
 
 ---
 

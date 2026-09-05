@@ -5,6 +5,74 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### No broker OAuth — a design conclusion, not a missing feature
+
+Asked directly: "what's the point without logging into Zerodha/Kite?" The
+product's actual job is telling you what changed and whether it matters — it
+never needs your holdings, cost basis, or account value to do that. Position
+size (below) is the one broker-adjacent fact it uses, and it's a typed-in
+number, not a credential. Adding OAuth would mean asking for far more trust
+(read access to a real brokerage account) than the job justifies, for a
+feature (ranking nudge) that a plain number already solves. This isn't new —
+CLAUDE.md and spec §11 already said no OAuth — but it's worth stating as a
+conclusion, not just a constraint someone handed down.
+
+---
+
+### Position size: a bounded ranking nudge, computed at read time, never stored on the event
+
+"A 3-sigma move in something you barely hold shouldn't outrank nothing" — but
+it also must never let a huge, barely-moving position outrank a real signal
+in something small. `positionBonus()` is a saturating function (`8 ·
+size/(size+100)`), capped well below what any score gap between a real event
+and noise would be. Computed in `buildDigest()` at read time from
+`watchlist_items.position_size` (per-user), applied only to this user's
+ranking — never written to the shared `events.score` column, which stays
+identical for every user watching that symbol (the scaling story: detection
+is shared, only preference is personal). Unit tested that it can never invert
+a real ordering, only break near-ties.
+
+---
+
+### Multi-market: per-symbol columns, each market's own calendar, no conversion
+
+`currency`, `exchange`, `timezone`, `benchmark_symbol` live on `symbols`, not
+as app-wide constants — proven with a second real market (3 US stocks + S&P
+500, real Yahoo data), not just a schema that could theoretically support one.
+Two decisions inside this:
+- **US bars are aligned to `^GSPC`'s own session set**, not NSE's — NYSE
+  holidays don't match NSE's (e.g. July 4th is an NSE trading day and a US
+  holiday; Diwali is the reverse). Forcing US bars onto the NSE calendar would
+  silently misalign every horizon calculation for US symbols.
+- **No currency conversion, anywhere, ever.** A z-score is dimensionless by
+  construction — `(AAPL's move in USD) / (AAPL's own USD volatility)` and
+  `(RELIANCE's move in INR) / (RELIANCE's own INR volatility)` are both just
+  "standard deviations," directly comparable with no FX rate touched. Only
+  the raw-price *display* needs the symbol's currency (`$` vs `₹`); the
+  entire detector engine is unaware currency exists.
+
+The one honest approximation: the digest header's `awaySessions` stat still
+uses the NSE calendar for everyone (a vanity summary number, spec's own
+"away" framing), while every per-symbol calculation (`decompose()`'s horizon)
+already counted sessions from that symbol's own `bars_daily` rows, not the
+shared calendar — so it was already correct for US symbols before this was
+even a design question.
+
+---
+
+### Charts are hand-rolled inline SVG, not Recharts
+
+The original stack decision (`SPEC.md` §2) named Recharts for sparklines.
+Once the ask grew to 4 chart types across digest cards and the table, a
+hand-rolled `<svg>` per chart (`sparkline.tsx`, `absence-chart.tsx`,
+`decomposition-bar.tsx`, `z-context-strip.tsx`) won out: no new dependency,
+full control over the palette (spec §10's five colours, no library defaults
+leaking in), and each one is genuinely a few line segments or dots — not
+enough complexity to justify ~90KB of library for. Deviates from the original
+plan; logged rather than silently swapped.
+
+---
+
 ### Sector clustering: the one-factor model's honest blind spot
 
 `idio_z` strips out NIFTY, not the sector — it's a single-factor model

@@ -20,6 +20,11 @@ export type WatchlistItem = {
   addedAt: string;
   mutedUntil: string | null;
   lastSeenAt: string | null;
+  positionSize: string | null;
+  exchange: string;
+  currency: string;
+  benchmarkSymbol: string;
+  sparkline: number[] | null;
   quote: Quote | null;
 };
 
@@ -49,6 +54,12 @@ export type Decomposition = {
 
 export type SectorCluster = { sector: string; symbols: string[] };
 
+export type SymbolChart = {
+  closes: { date: string; close: number }[];
+  zHistory: { date: string; z: number }[];
+  watermarkDate: string | null;
+};
+
 export type DigestEvent = {
   id: string;
   symbol: string;
@@ -61,6 +72,10 @@ export type DigestEvent = {
   thesis: string | null;
   sinceLastSeen: Decomposition | null;
   sectorCluster: SectorCluster | null;
+  currency: string;
+  positionSize: number | null;
+  positionBonus: number;
+  chart: SymbolChart | null;
 };
 
 export type Digest = {

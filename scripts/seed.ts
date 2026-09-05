@@ -1,7 +1,10 @@
 /**
  * Seed the database from the committed dataset. No API keys, no network.
- *   - symbols  : 30 NSE equities + NIFTY 50   (src/lib/seed-data.ts)
- *   - bars_daily : ~250 real trading sessions  (src/lib/seed/bars.json)
+ *   - symbols  : 30 NSE equities + NIFTY 50, plus 3 US equities + S&P 500
+ *     (src/lib/seed-data.ts) — multi-market is per-symbol columns
+ *     (currency/exchange/timezone/benchmark), not global constants
+ *   - bars_daily : ~250 real trading sessions per market, each aligned to
+ *     ITS OWN exchange's calendar (src/lib/seed/bars.json)
  *   - quotes_latest : derived from each symbol's last two bars, with the
  *     staleness metadata the client contract requires (spec §7)
  *
@@ -15,7 +18,7 @@ import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { sql } from "drizzle-orm";
 import { barsDaily, newsEvents, quotesLatest, symbols } from "../src/lib/db/schema";
-import { SEED_SYMBOLS, NIFTY_SYMBOL } from "../src/lib/seed-data";
+import { SEED_SYMBOLS, NIFTY_SYMBOL, SPX_SYMBOL } from "../src/lib/seed-data";
 
 type SeedBar = { d: string; o: number; h: number; l: number; c: number; ac: number; v: number };
 type BarsFile = {
@@ -28,9 +31,13 @@ const url =
   process.env.DATABASE_URL ??
   "postgres://watchlist:watchlist@localhost:5432/watchlist";
 
-// NSE closes at 15:30 IST = 10:00:00Z. Seed quotes are stamped at the close of
-// their last session so the UI shows "as of close, <date>" rather than "live".
-const closeTs = (isoDate: string) => new Date(`${isoDate}T10:00:00.000Z`);
+// NSE closes at 15:30 IST = 10:00:00Z; NYSE/NASDAQ close at 16:00 ET, ≈20:00Z
+// (a fixed offset, not DST-exact — fine for seed metadata, not detector maths).
+// Seed quotes are stamped at their last session's close so the UI shows
+// "as of close, <date>" rather than a fake "live".
+const US_SYMBOLS = new Set(["AAPL", "MSFT", "GOOGL", SPX_SYMBOL]);
+const closeTs = (isoDate: string, symbol: string) =>
+  new Date(`${isoDate}T${US_SYMBOLS.has(symbol) ? "20:00:00" : "10:00:00"}.000Z`);
 
 async function main() {
   const barsFile = JSON.parse(
@@ -52,14 +59,31 @@ async function main() {
       sector: "Index",
       listedOn: "1996-04-22",
       isActive: true,
+      currency: "INR",
+      timezone: "Asia/Kolkata",
+      benchmarkSymbol: NIFTY_SYMBOL, // an index doesn't regress against itself meaningfully; unused for NIFTY
+    },
+    {
+      symbol: SPX_SYMBOL,
+      name: "S&P 500",
+      exchange: "NYSE",
+      sector: "Index",
+      listedOn: "1957-03-04",
+      isActive: true,
+      currency: "USD",
+      timezone: "America/New_York",
+      benchmarkSymbol: SPX_SYMBOL,
     },
     ...SEED_SYMBOLS.map((s) => ({
       symbol: s.symbol,
       name: s.name,
-      exchange: "NSE",
+      exchange: s.exchange ?? "NSE",
       sector: s.sector,
       listedOn: s.listedOn,
       isActive: s.isActive ?? true,
+      currency: s.currency ?? "INR",
+      timezone: s.timezone ?? "Asia/Kolkata",
+      benchmarkSymbol: s.benchmarkSymbol ?? NIFTY_SYMBOL,
     })),
   ];
 
@@ -72,6 +96,10 @@ async function main() {
         name: sql`excluded.name`,
         sector: sql`excluded.sector`,
         isActive: sql`excluded.is_active`,
+        exchange: sql`excluded.exchange`,
+        currency: sql`excluded.currency`,
+        timezone: sql`excluded.timezone`,
+        benchmarkSymbol: sql`excluded.benchmark_symbol`,
       },
     });
   console.log(`✓ ${symbolRows.length} symbols`);
@@ -112,7 +140,7 @@ async function main() {
       symbol,
       price: String(last.c),
       prevClose: String(prev.c),
-      exchangeTs: closeTs(last.d),
+      exchangeTs: closeTs(last.d, symbol),
       fetchedAt: new Date(),
       source: "seed",
       isDisputed: false,

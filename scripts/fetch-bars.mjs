@@ -31,8 +31,20 @@ const EQUITIES = [
   // delisted/renamed example — see src/lib/seed-data.ts.
 ];
 
+// Multi-market proof (spec addendum): a second market, its own benchmark, its
+// own trading calendar — NYSE/NASDAQ holidays don't match NSE's, so these are
+// aligned to ^GSPC's own session set, never NSE's. No currency conversion:
+// prices stay in USD, only the detector's z-scores travel between markets.
+const SPX_SYMBOL = "SPX500";
+const US_EQUITIES = ["AAPL", "MSFT", "GOOGL"];
+
 const TARGET_SESSIONS = 250;
-const yahooSymbol = (s) => (s === NIFTY_SYMBOL ? "^NSEI" : `${s}.NS`);
+const yahooSymbol = (s) => {
+  if (s === NIFTY_SYMBOL) return "^NSEI";
+  if (s === SPX_SYMBOL) return "^GSPC";
+  if (US_EQUITIES.includes(s)) return s;
+  return `${s}.NS`;
+};
 
 /** yahoo daily bars are stamped 03:45:00Z (09:15 IST open) — take the IST date. */
 const istDate = (d) =>
@@ -88,6 +100,28 @@ async function main() {
       bars[sym] = [];
     }
     await new Promise((r) => setTimeout(r, 250)); // be polite
+  }
+
+  console.log(`\n→ fetching ^GSPC to establish the US session calendar…`);
+  const spxRaw = await fetchBars(SPX_SYMBOL);
+  const usSessions = [...new Set(spxRaw.map((b) => b.d))].sort().slice(-TARGET_SESSIONS);
+  const usSessionSet = new Set(usSessions);
+  console.log(`  ${usSessions.length} sessions: ${usSessions[0]} … ${usSessions.at(-1)}`);
+  bars[SPX_SYMBOL] = spxRaw.filter((b) => usSessionSet.has(b.d));
+
+  for (const sym of US_EQUITIES) {
+    process.stdout.write(`→ ${sym} `);
+    try {
+      const raw = await fetchBars(sym);
+      const aligned = raw.filter((b) => usSessionSet.has(b.d));
+      bars[sym] = aligned;
+      const missing = usSessions.length - aligned.length;
+      console.log(`${aligned.length} bars${missing ? `  (${missing} missing sessions)` : ""}`);
+    } catch (err) {
+      console.log(`FAILED — ${err.message}`);
+      bars[sym] = [];
+    }
+    await new Promise((r) => setTimeout(r, 250));
   }
 
   await mkdir(SEED_DIR, { recursive: true });

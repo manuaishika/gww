@@ -20,6 +20,7 @@ export const PATCH = handler(async (req: NextRequest, ctx: Ctx) => {
   const body = (await req.json().catch(() => ({}))) as {
     thesis?: string | null;
     mutedUntil?: string | null;
+    positionSize?: number | null;
   };
 
   const ok = await updateWatchlistItem(user.id, symbol.toUpperCase(), body);

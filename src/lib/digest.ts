@@ -13,10 +13,10 @@ import { db } from "./db";
 import { events as eventsTable, statsDaily, userEventState } from "./db/schema";
 import { listWatchlist, type WatchlistRow } from "./watchlist";
 import { loadBars } from "./detect-run";
-import { NIFTY_SYMBOL } from "./seed-data";
 import { computeSignals, type Bar, type SymbolStats } from "./detectors";
 import { lastSession, sessionsBetween } from "./nse-calendar";
 import { clusterSectorMoves, type SectorCluster } from "./sector-cluster";
+import { effectiveScore, positionBonus } from "./position-weight";
 
 const MS_DAY = 86_400_000;
 const num = (v: string | null): number | null => (v == null ? null : Number(v));
@@ -37,6 +37,20 @@ export type DigestEvent = {
   /** ≥3 watched symbols in the same sector fired idio_z the same session —
    *  see buildDigest for why that's a model limitation, not 3 separate stories. */
   sectorCluster: SectorCluster | null;
+  currency: string;
+  positionSize: number | null;
+  /** points added to score by position size when ranking (never stored) — 0 if none set. */
+  positionBonus: number;
+  chart: SymbolChart | null;
+};
+
+export type SymbolChart = {
+  /** last 60 sessions, chronological — the "absence chart" (spec addendum). */
+  closes: { date: string; close: number }[];
+  /** the daily return z (r / σ₆₀) for each of those sessions — the "z-context strip". */
+  zHistory: { date: string; z: number }[];
+  /** first session strictly after the watermark — where to shade the absence chart. */
+  watermarkDate: string | null;
 };
 
 type Decomposition = {
@@ -147,10 +161,18 @@ export async function buildDigest(userId: string): Promise<Digest> {
   );
   const declustered = sinceWatermark.filter((e) => !suppressedEventIds.has(e.id));
 
-  // one event per (symbol) for the headline set — the highest-scoring —
-  // keeping the rest for the collapsed count
+  // one event per (symbol) for the headline set — ranked by score PLUS the
+  // optional position-size nudge (spec addendum) — kept out of the shared
+  // events.score column entirely; this only affects this user's ranking.
+  // Keep the rest for the collapsed count.
   const seenSymbol = new Set<string>();
-  const ranked = [...declustered].sort((a, b) => Number(b.score) - Number(a.score));
+  const ranked = [...declustered].sort((a, b) => {
+    const posA = num(bySymbol.get(a.symbol)?.positionSize ?? null);
+    const posB = num(bySymbol.get(b.symbol)?.positionSize ?? null);
+    return (
+      effectiveScore(Number(b.score), posB) - effectiveScore(Number(a.score), posA)
+    );
+  });
   const primary: typeof ranked = [];
   const secondary: typeof ranked = [];
   for (const e of ranked) {
@@ -164,8 +186,19 @@ export async function buildDigest(userId: string): Promise<Digest> {
   const headlineRows = primary.slice(0, 5);
   const rest = [...primary.slice(5), ...secondary];
 
-  // --- decomposition since watermark, per headline symbol ---
-  const indexBars = await loadBars(NIFTY_SYMBOL);
+  // --- decomposition + chart data since watermark, per headline symbol ---
+  // Every symbol regresses against ITS OWN benchmark (spec addendum), not one
+  // global index — load each distinct benchmark's bars once.
+  const benchmarkCache = new Map<string, Promise<Bar[]>>();
+  const getBenchmarkBars = (benchmarkSymbol: string) => {
+    let p = benchmarkCache.get(benchmarkSymbol);
+    if (!p) {
+      p = loadBars(benchmarkSymbol);
+      benchmarkCache.set(benchmarkSymbol, p);
+    }
+    return p;
+  };
+
   const statsRows = headlineRows.length
     ? await db
         .select()
@@ -177,12 +210,12 @@ export async function buildDigest(userId: string): Promise<Digest> {
   const headlines: DigestEvent[] = [];
   for (const e of headlineRows) {
     const item = bySymbol.get(e.symbol)!;
-    const decomposition = await decompose(
-      e.symbol,
-      item.lastSeenAt,
-      indexBars,
-      statsBySymbol.get(e.symbol) ?? null,
-    );
+    const indexBars = await getBenchmarkBars(item.benchmarkSymbol);
+    const stats = statsBySymbol.get(e.symbol) ?? null;
+    const bars = await loadBars(e.symbol);
+    const decomposition = decompose(e.symbol, item.lastSeenAt, bars, indexBars, stats);
+    const chart = buildSymbolChart(bars, item.lastSeenAt, stats);
+    const positionSize = num(item.positionSize);
     headlines.push({
       id: e.id,
       symbol: e.symbol,
@@ -195,6 +228,10 @@ export async function buildDigest(userId: string): Promise<Digest> {
       thesis: item.thesis,
       sinceLastSeen: decomposition,
       sectorCluster: clusterByRepresentativeId.get(e.id) ?? null,
+      currency: item.currency,
+      positionSize,
+      positionBonus: round(positionBonus(positionSize), 1),
+      chart,
     });
   }
 
@@ -224,15 +261,14 @@ export async function buildDigest(userId: string): Promise<Digest> {
   };
 }
 
-async function decompose(
+function decompose(
   symbol: string,
   watermarkIso: string | null,
+  bars: Bar[],
   indexBars: Bar[],
   stats: SymbolStats | null,
-): Promise<Decomposition | null> {
-  if (!stats) return null;
-  const bars = await loadBars(symbol);
-  if (bars.length < 2) return null;
+): Decomposition | null {
+  if (!stats || bars.length < 2) return null;
 
   const wm = watermarkIso ? watermarkIso.slice(0, 10) : bars[0].sessionDate;
   // baseline = last session on or before the watermark
@@ -258,6 +294,38 @@ async function decompose(
     marketPct: round((Math.exp(signals.marketLogRet ?? 0) - 1) * 100, 2),
     companyPct: round((Math.exp(signals.residual ?? signals.ret) - 1) * 100, 2),
   };
+}
+
+const CHART_SESSIONS = 60;
+
+/**
+ * Chart data for a headline card (spec addendum, 4 cheap charts):
+ *   - absence chart: last 60 sessions' close, shaded from `watermarkDate`
+ *   - z-context strip: each of those sessions' own return z, so the current
+ *     move's outlier status is visible in the distribution, not asserted
+ * Reuses the same bars array `decompose` already has — no extra query.
+ */
+function buildSymbolChart(
+  bars: Bar[],
+  watermarkIso: string | null,
+  stats: SymbolStats | null,
+): SymbolChart | null {
+  if (bars.length < 2) return null;
+  const window = bars.slice(-CHART_SESSIONS);
+  const sigma60 = stats?.sigma60;
+
+  const closes = window.map((b) => ({ date: b.sessionDate, close: b.adjClose }));
+  const zHistory: { date: string; z: number }[] = [];
+  for (let i = 1; i < window.length; i++) {
+    if (!sigma60 || sigma60 <= 0) break;
+    const r = Math.log(window[i].adjClose / window[i - 1].adjClose);
+    zHistory.push({ date: window[i].sessionDate, z: round(r / sigma60, 3) });
+  }
+
+  const wm = watermarkIso ? watermarkIso.slice(0, 10) : null;
+  const watermarkDate = wm ? (window.find((b) => b.sessionDate > wm)?.sessionDate ?? null) : null;
+
+  return { closes, zHistory, watermarkDate };
 }
 
 function toStats(s: typeof statsDaily.$inferSelect): SymbolStats {

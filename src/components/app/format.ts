@@ -10,12 +10,26 @@ export const signed = (n: number | null | undefined, dp = 1): string => {
 export const pct = (n: number | null | undefined, dp = 1): string =>
   n == null || Number.isNaN(n) ? "—" : `${signed(n, dp)}%`;
 
-export const rupees = (v: string | number | null | undefined): string => {
+// Multi-market (spec addendum): currency is per-symbol, never converted.
+// A symbol in USD shows $; INR shows ₹. Materiality (z-scores, %) is
+// currency-free and compares across markets without any of this.
+const CURRENCY_SYMBOL: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£" };
+const CURRENCY_LOCALE: Record<string, string> = { INR: "en-IN", USD: "en-US" };
+
+export const money = (
+  v: string | number | null | undefined,
+  currency: string = "INR",
+): string => {
   if (v == null) return "—";
   const n = typeof v === "string" ? Number(v) : v;
   if (Number.isNaN(n)) return "—";
-  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  const symbol = CURRENCY_SYMBOL[currency] ?? `${currency} `;
+  const locale = CURRENCY_LOCALE[currency] ?? "en-US";
+  return `${symbol}${n.toLocaleString(locale, { maximumFractionDigits: 2 })}`;
 };
+
+/** @deprecated use `money(v, currency)` — kept only while callers migrate. */
+export const rupees = (v: string | number | null | undefined): string => money(v, "INR");
 
 const FLAG_LABEL: Record<string, string> = {
   new_252d_high: "new 252-session high",

@@ -21,7 +21,7 @@ import { allSessions } from "../src/lib/nse-calendar";
 const DEMO_USER_ID = "d0d0d0d0-0000-4000-8000-000000000001";
 const DEMO_CODE = "GRW-24X";
 
-const WATCHLIST: { symbol: string; thesis?: string }[] = [
+const WATCHLIST: { symbol: string; thesis?: string; positionSize?: number }[] = [
   {
     symbol: "RELIANCE",
     thesis:
@@ -31,14 +31,26 @@ const WATCHLIST: { symbol: string; thesis?: string }[] = [
   {
     symbol: "ADANIENT",
     thesis: "High-beta proxy for the group. In only for the volatility, out on any governance headline.",
+    positionSize: 25, // small holding — a real move here shouldn't need a boost to matter
   },
-  { symbol: "TITAN", thesis: "Discretionary bellwether — reads through to urban demand." },
+  {
+    symbol: "TITAN",
+    thesis: "Discretionary bellwether — reads through to urban demand.",
+    positionSize: 400, // a real, sizeable position — modest ranking nudge, not an override
+  },
   { symbol: "SUNPHARMA" },
   { symbol: "INFY" },
   { symbol: "COALINDIA", thesis: "Dividend yield play; watching for a policy-driven re-rating." },
   { symbol: "TATAMOTORS" }, // demerged — exercises the delisted/renamed path
   { symbol: "NESTLEIND" }, // staged silence example: results w/ no repricing
   { symbol: "WIPRO" }, // staged news-density example: headline cluster, no move
+  // --- multi-market (spec addendum): a second market, own benchmark, own currency ---
+  {
+    symbol: "AAPL",
+    thesis: "Services mix shift — watching for the next iPhone-cycle guide, not the daily noise.",
+    positionSize: 15,
+  },
+  { symbol: "MSFT" },
 ];
 
 async function main() {
@@ -54,11 +66,12 @@ async function main() {
   const sessions = allSessions();
   const watermark = new Date(`${sessions[Math.max(0, sessions.length - 26)]}T10:00:00.000Z`);
 
-  for (const { symbol, thesis } of WATCHLIST) {
+  for (const { symbol, thesis, positionSize } of WATCHLIST) {
     await db.insert(watchlistItems).values({
       userId: DEMO_USER_ID,
       symbol,
       thesis: thesis ?? null,
+      positionSize: positionSize != null ? String(positionSize) : null,
       addedAt: watermark,
     });
     await db.insert(userSymbolState).values({
@@ -77,15 +90,24 @@ async function main() {
   }
   if (digest.headlines.length === 0) problems.push("no headlines");
   if (digest.headlines.length > 5) problems.push("more than 5 headlines");
-  const scores = digest.headlines.map((h) => h.score);
-  if (scores.some((s, i) => i > 0 && s > scores[i - 1])) {
-    problems.push("headlines not sorted by score desc");
+  // ranked by score + position-size bonus (spec addendum), not raw score alone
+  const effective = digest.headlines.map((h) => h.score + h.positionBonus);
+  if (effective.some((s, i) => i > 0 && s > effective[i - 1] + 1e-9)) {
+    problems.push("headlines not sorted by effective (score + position bonus) desc");
   }
   const zCanBeZero = new Set(["structural", "silence"]);
   for (const h of digest.headlines) {
     if (!(h.z !== 0 || zCanBeZero.has(h.detector))) {
       problems.push(`${h.symbol}/${h.detector}: z is 0`);
     }
+    if (!h.currency) problems.push(`${h.symbol}: missing currency`);
+    if (!h.chart) problems.push(`${h.symbol}: missing chart data`);
+  }
+  const usdHeadline = digest.headlines.find((h) => h.currency === "USD");
+  if (WATCHLIST.some((w) => w.symbol === "AAPL" || w.symbol === "MSFT") && !usdHeadline) {
+    // not a hard failure — US names may legitimately not make top 5 — but
+    // worth knowing if the whole multi-market path is silently broken
+    console.log("  (note: no USD symbol reached the top 5 this run — check manually if unexpected)");
   }
 
   console.log(
@@ -95,9 +117,10 @@ async function main() {
   );
   for (const h of digest.headlines) {
     const d = h.sinceLastSeen;
+    const bonus = h.positionBonus > 0 ? ` +${h.positionBonus.toFixed(1)}pos` : "";
     console.log(
-      `  ${h.symbol.padEnd(11)} ${h.detector.padEnd(11)} z=${h.z.toFixed(2).padStart(6)} ` +
-        `score=${h.score.toFixed(0)}` +
+      `  ${h.symbol.padEnd(8)} [${h.currency}] ${h.detector.padEnd(11)} z=${h.z.toFixed(2).padStart(6)} ` +
+        `score=${h.score.toFixed(0)}${bonus}` +
         (d ? `  since: ${d.totalPct > 0 ? "+" : ""}${d.totalPct}% (mkt ${d.marketPct}%, co ${d.companyPct}%)` : ""),
     );
   }

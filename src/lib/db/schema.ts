@@ -31,12 +31,19 @@ export const users = pgTable("users", {
 });
 
 export const symbols = pgTable("symbols", {
-  symbol: text("symbol").primaryKey(), // NSE ticker, no suffix: "RELIANCE"
+  symbol: text("symbol").primaryKey(), // ticker as the detector engine sees it, no exchange suffix
   name: text("name").notNull(),
   exchange: text("exchange").notNull().default("NSE"),
   sector: text("sector"),
   listedOn: date("listed_on"),
   isActive: boolean("is_active").notNull().default(true), // delisted/renamed → false
+  // Multi-market (spec addendum): per-symbol, not global constants. NSE
+  // regresses against NIFTY50, US against its own benchmark. No currency
+  // conversion, ever — z-scores are unitless, so materiality compares across
+  // currencies for free; only the raw-price display needs to know the symbol.
+  currency: text("currency").notNull().default("INR"), // ISO 4217, display only
+  timezone: text("timezone").notNull().default("Asia/Kolkata"), // IANA tz, display only
+  benchmarkSymbol: text("benchmark_symbol").notNull().default("NIFTY50"), // references symbols.symbol
 });
 
 export const watchlistItems = pgTable(
@@ -52,6 +59,11 @@ export const watchlistItems = pgTable(
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
     thesis: text("thesis"), // "why am I watching this" — spec §8
     mutedUntil: timestamp("muted_until", { withTimezone: true }),
+    // Optional, per-item, per-user (never touches the shared `events.score`).
+    // Units are the symbol's own shares/units — no valuation, no broker link.
+    // "A 3-sigma move in something you barely hold outranks nothing": it's a
+    // bounded ranking nudge at digest time, not an override of materiality.
+    positionSize: numeric("position_size"),
   },
   (t) => ({
     userSymbol: unique("watchlist_items_user_symbol").on(t.userId, t.symbol),

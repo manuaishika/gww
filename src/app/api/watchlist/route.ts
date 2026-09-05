@@ -14,14 +14,19 @@ export const GET = handler(async () => {
 export const POST = handler(async (req: NextRequest) => {
   const user = await getOrCreateUser();
   const body = (await req.json().catch(() => null)) as
-    | { symbol?: string; thesis?: string }
+    | { symbol?: string; thesis?: string; positionSize?: number }
     | null;
 
   const symbol = body?.symbol?.trim().toUpperCase();
   if (!symbol) return badRequest("symbol is required");
 
   try {
-    const result = await addToWatchlist(user.id, symbol, body?.thesis ?? null);
+    const result = await addToWatchlist(
+      user.id,
+      symbol,
+      body?.thesis ?? null,
+      body?.positionSize ?? null,
+    );
     return json(result, result.added ? 201 : 200);
   } catch (err) {
     return badRequest(err instanceof Error ? err.message : "could not add");

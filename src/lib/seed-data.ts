@@ -11,9 +11,15 @@ export type SeedSymbol = {
   listedOn: string; // ISO date
   isActive?: boolean; // default true; false = delisted/renamed (spec §9)
   note?: string;
+  // Multi-market: default to NSE/INR/IST/NIFTY when omitted.
+  exchange?: string;
+  currency?: string;
+  timezone?: string;
+  benchmarkSymbol?: string;
 };
 
 export const NIFTY_SYMBOL = "NIFTY50";
+export const SPX_SYMBOL = "SPX500";
 
 export const SEED_SYMBOLS: SeedSymbol[] = [
   { symbol: "RELIANCE", name: "Reliance Industries", sector: "Energy", listedOn: "1995-11-29" },
@@ -54,4 +60,41 @@ export const SEED_SYMBOLS: SeedSymbol[] = [
   { symbol: "HCLTECH", name: "HCL Technologies", sector: "IT", listedOn: "2000-01-06" },
   { symbol: "DRREDDY", name: "Dr. Reddy's Laboratories", sector: "Pharma", listedOn: "1995-11-08" },
   { symbol: "EICHERMOT", name: "Eicher Motors", sector: "Auto", listedOn: "1995-07-03" },
+
+  // --- Multi-market proof (spec addendum) ---------------------------------
+  // Currency, exchange, timezone and benchmark are per-symbol columns, not
+  // global constants. These regress against SPX500, not NIFTY — a real
+  // second market, not a hypothetical one. No currency conversion, anywhere:
+  // z-scores are unitless, so an AAPL move and a RELIANCE move compare on
+  // materiality without ever touching an FX rate.
+  {
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    sector: "IT",
+    listedOn: "1980-12-12",
+    exchange: "NASDAQ",
+    currency: "USD",
+    timezone: "America/New_York",
+    benchmarkSymbol: SPX_SYMBOL,
+  },
+  {
+    symbol: "MSFT",
+    name: "Microsoft Corp.",
+    sector: "IT",
+    listedOn: "1986-03-13",
+    exchange: "NASDAQ",
+    currency: "USD",
+    timezone: "America/New_York",
+    benchmarkSymbol: SPX_SYMBOL,
+  },
+  {
+    symbol: "GOOGL",
+    name: "Alphabet Inc.",
+    sector: "IT",
+    listedOn: "2004-08-19",
+    exchange: "NASDAQ",
+    currency: "USD",
+    timezone: "America/New_York",
+    benchmarkSymbol: SPX_SYMBOL,
+  },
 ];

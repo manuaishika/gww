@@ -1,7 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { AbsenceChart } from "./absence-chart";
 import { headlinePct, whyLine } from "./card-copy";
+import { DecompositionBar } from "./decomposition-bar";
 import { pct } from "./format";
+import { ZContextStrip } from "./z-context-strip";
 import type { Digest, DigestEvent } from "./types";
 
 // Weight and position encode materiality (spec §10) — the top card is larger
@@ -64,6 +68,7 @@ function Card({
   onDismiss: () => void;
   busy: boolean;
 }) {
+  const [showChart, setShowChart] = useState(false);
   const headline = headlinePct(event);
   const up = (headline ?? 0) >= 0;
 
@@ -75,7 +80,10 @@ function Card({
         <div className="min-w-0">
           <h3 className={`${scale.title} font-semibold leading-snug text-ink`}>
             {event.name}{" "}
-            <span className="font-normal text-slate">{event.symbol}</span>
+            <span className="font-normal text-slate">
+              {event.symbol}
+              {event.currency !== "INR" && ` · ${event.currency}`}
+            </span>
           </h3>
           <p className="mt-1 text-[13px] text-slate">{whyLine(event)}</p>
         </div>
@@ -101,17 +109,53 @@ function Card({
       </div>
 
       {event.sinceLastSeen && (
-        <p className="mt-2 text-[12.5px] text-slate">
-          since you checked ({sinceLabel(event.sinceLastSeen.sessions)}):{" "}
-          {pct(event.sinceLastSeen.totalPct)} total — {pct(event.sinceLastSeen.marketPct)} market,{" "}
-          {pct(event.sinceLastSeen.companyPct)} company
-        </p>
+        <div className="mt-3">
+          <p className="text-[12.5px] text-slate">
+            since you checked ({sinceLabel(event.sinceLastSeen.sessions)})
+            {event.positionBonus > 0 && (
+              <span className="ml-2 text-[11px] text-signal">
+                · ranked up {event.positionBonus.toFixed(1)}pt for position size
+              </span>
+            )}
+          </p>
+          <div className="mt-1.5 max-w-sm">
+            <DecompositionBar
+              marketPct={event.sinceLastSeen.marketPct}
+              companyPct={event.sinceLastSeen.companyPct}
+            />
+          </div>
+        </div>
       )}
 
       {event.thesis && (
         <p className="mt-2 border-l-2 border-ink/10 pl-3 text-[13px] italic text-ink/80">
           &ldquo;{event.thesis}&rdquo;
         </p>
+      )}
+
+      {event.chart && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setShowChart((v) => !v)}
+            className="text-[11.5px] text-slate hover:text-ink"
+          >
+            {showChart ? "▾ hide chart" : "▸ show 60-day chart"}
+          </button>
+          {showChart && (
+            <div className="mt-2 max-w-sm space-y-2">
+              <AbsenceChart
+                closes={event.chart.closes}
+                watermarkDate={event.chart.watermarkDate}
+              />
+              <ZContextStrip zHistory={event.chart.zHistory} currentZ={event.z} />
+              <p className="text-[10.5px] text-slate">
+                shaded: since you last checked · dot: this move against the last{" "}
+                {event.chart.zHistory.length} daily moves
+              </p>
+            </div>
+          )}
+        </div>
       )}
     </article>
   );

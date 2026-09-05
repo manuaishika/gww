@@ -26,17 +26,18 @@ import {
   type NewsItem,
   type SessionEvent,
 } from "./detectors";
-import { NIFTY_SYMBOL } from "./seed-data";
-
-// NSE closes at 15:30 IST = 10:00:00Z. A live cron runs shortly after close,
-// so this is what `detected_at` would genuinely be — matters because a
-// backfill that stamps every historical row with "right now" makes the
-// digest's `detected_at > last_seen_at` filter (spec §5) meaningless: every
-// row looks "just detected" regardless of the session it's actually from,
-// and a watermark set to any date before the backfill ran would (wrongly)
-// surface the entire history as new. Found while testing the sector-cluster
-// feature against a real event from months back — see DECISIONS.md.
-const sessionCloseTs = (sessionDate: string) => new Date(`${sessionDate}T10:00:00.000Z`);
+// NSE closes at 15:30 IST = 10:00:00Z; NYSE/NASDAQ close at 16:00 ET ≈ 20:00Z
+// (fixed offset, not DST-exact — fine for a "detected around close" stamp).
+// A live cron runs shortly after close, so this is what `detected_at` would
+// genuinely be — matters because a backfill that stamps every historical row
+// with "right now" makes the digest's `detected_at > last_seen_at` filter
+// (spec §5) meaningless: every row looks "just detected" regardless of the
+// session it's actually from, and a watermark set to any date before the
+// backfill ran would (wrongly) surface the entire history as new. Found
+// while testing the sector-cluster feature against a real event from months
+// back — see DECISIONS.md.
+const sessionCloseTs = (sessionDate: string, currency: string) =>
+  new Date(`${sessionDate}T${currency === "USD" ? "20:00:00" : "10:00:00"}.000Z`);
 
 const num = (v: string | null): number => (v == null ? NaN : Number(v));
 
@@ -114,16 +115,45 @@ export async function refreshStats(symbol: string, indexBars: Bar[]): Promise<vo
     });
 }
 
-export async function refreshAllStats(): Promise<number> {
-  const indexBars = await loadBars(NIFTY_SYMBOL);
-  const all = await db
-    .select({ symbol: symbols.symbol })
+/**
+ * Every symbol regresses against ITS OWN benchmark (spec addendum) — NSE
+ * names against NIFTY50, US names against SPX500 — not a single global
+ * index. `symbols.benchmark_symbol` says which; an index doesn't regress
+ * against itself, so a symbol whose benchmark is itself is skipped.
+ */
+async function activeSymbolsWithBenchmark(): Promise<
+  { symbol: string; benchmarkSymbol: string; currency: string }[]
+> {
+  return db
+    .select({
+      symbol: symbols.symbol,
+      benchmarkSymbol: symbols.benchmarkSymbol,
+      currency: symbols.currency,
+    })
     .from(symbols)
     .where(eq(symbols.isActive, true));
+}
+
+/** Loads each distinct benchmark's bars once, however many symbols share it. */
+function benchmarkBarsCache() {
+  const cache = new Map<string, Promise<Bar[]>>();
+  return (benchmarkSymbol: string) => {
+    let p = cache.get(benchmarkSymbol);
+    if (!p) {
+      p = loadBars(benchmarkSymbol);
+      cache.set(benchmarkSymbol, p);
+    }
+    return p;
+  };
+}
+
+export async function refreshAllStats(): Promise<number> {
+  const all = await activeSymbolsWithBenchmark();
+  const getBenchmarkBars = benchmarkBarsCache();
   let n = 0;
-  for (const { symbol } of all) {
-    if (symbol === NIFTY_SYMBOL) continue;
-    await refreshStats(symbol, indexBars);
+  for (const { symbol, benchmarkSymbol } of all) {
+    if (symbol === benchmarkSymbol) continue; // an index vs. itself is meaningless
+    await refreshStats(symbol, await getBenchmarkBars(benchmarkSymbol));
     n++;
   }
   return n;
@@ -138,6 +168,7 @@ export async function detectForSymbol(
   symbol: string,
   indexBars: Bar[],
   lookback: number,
+  currency: string = "INR",
 ): Promise<number> {
   const bars = await loadBars(symbol);
   if (bars.length < CONFIG.history.minSessionsForStats + 1) return 0;
@@ -213,7 +244,7 @@ export async function detectForSymbol(
         score: e.score.toString(),
         z: e.z.toString(),
         payload: e.signals,
-        detectedAt: sessionCloseTs(e.sessionDate),
+        detectedAt: sessionCloseTs(e.sessionDate, currency),
       })),
     )
     .onConflictDoNothing({ target: eventsTable.dedupeKey })
@@ -222,17 +253,15 @@ export async function detectForSymbol(
 }
 
 export async function detectAll(lookback = 45): Promise<{ symbols: number; events: number }> {
-  const indexBars = await loadBars(NIFTY_SYMBOL);
-  const active = await db
-    .select({ symbol: symbols.symbol })
-    .from(symbols)
-    .where(eq(symbols.isActive, true));
+  const active = await activeSymbolsWithBenchmark();
+  const getBenchmarkBars = benchmarkBarsCache();
 
   let events = 0;
   let count = 0;
-  for (const { symbol } of active) {
-    if (symbol === NIFTY_SYMBOL) continue;
-    events += await detectForSymbol(symbol, indexBars, lookback);
+  for (const { symbol, benchmarkSymbol, currency } of active) {
+    if (symbol === benchmarkSymbol) continue;
+    const indexBars = await getBenchmarkBars(benchmarkSymbol);
+    events += await detectForSymbol(symbol, indexBars, lookback, currency);
     count++;
   }
   return { symbols: count, events };

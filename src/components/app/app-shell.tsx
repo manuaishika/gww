@@ -72,6 +72,11 @@ export function AppShell() {
     await load();
   }
 
+  async function savePosition(symbol: string, size: number | null) {
+    await api.updatePositionSize(symbol, size);
+    await load();
+  }
+
   async function loadDemo() {
     setLoadingDemo(true);
     try {
@@ -149,6 +154,7 @@ export function AppShell() {
               items={items}
               onRemove={remove}
               onSaveThesis={saveThesis}
+              onSavePosition={savePosition}
               busySymbol={busyKey}
             />
           )}
@@ -185,8 +191,9 @@ function FirstRun({
       <div className="rounded-md border border-ink/10 bg-ink/[0.02] p-5">
         <p className="text-[14px] font-medium text-ink">See it working first</p>
         <p className="mt-1 text-[13px] text-slate">
-          Loads a populated example — 10 NSE stocks, real detector events, theses
-          attached. Account code <code className="rounded-sm bg-ink/5 px-1 py-0.5">{DEMO_CODE}</code>.
+          A populated example — NSE and US stocks side by side, real detector
+          events, charts, theses, one position-sized holding. Account code{" "}
+          <code className="rounded-sm bg-ink/5 px-1 py-0.5">{DEMO_CODE}</code>.
         </p>
         <button
           type="button"

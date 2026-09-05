@@ -15,6 +15,13 @@
       "when": 1788593300837,
       "tag": "0001_fresh_amphibian",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788600605947,
+      "tag": "0002_nostalgic_human_robot",
+      "breakpoints": true
     }
   ]
 }

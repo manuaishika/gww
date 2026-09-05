@@ -32,10 +32,10 @@ export const api = {
     );
   },
 
-  add: (symbol: string, thesis?: string) =>
+  add: (symbol: string, thesis?: string, positionSize?: number) =>
     req<{ added: boolean }>("/api/watchlist", {
       method: "POST",
-      body: JSON.stringify({ symbol, thesis }),
+      body: JSON.stringify({ symbol, thesis, positionSize }),
     }),
 
   remove: (symbol: string) =>
@@ -47,6 +47,12 @@ export const api = {
     req<{ updated: boolean }>(`/api/watchlist/${encodeURIComponent(symbol)}`, {
       method: "PATCH",
       body: JSON.stringify({ thesis }),
+    }),
+
+  updatePositionSize: (symbol: string, positionSize: number | null) =>
+    req<{ updated: boolean }>(`/api/watchlist/${encodeURIComponent(symbol)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ positionSize }),
     }),
 
   markSeen: (body: { eventIds?: string[]; symbol?: string; all?: boolean }) =>

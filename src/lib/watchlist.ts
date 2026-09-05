@@ -1,9 +1,10 @@
 /**
  * Watchlist operations (spec §5, §6, §8). All take a userId; none mint sessions.
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
+  barsDaily,
   events,
   quotesLatest,
   symbols,
@@ -11,6 +12,8 @@ import {
   userSymbolState,
   watchlistItems,
 } from "./db/schema";
+
+const SPARKLINE_SESSIONS = 30;
 
 export type WatchlistRow = {
   symbol: string;
@@ -21,6 +24,13 @@ export type WatchlistRow = {
   addedAt: string;
   mutedUntil: string | null;
   lastSeenAt: string | null;
+  positionSize: string | null;
+  // Multi-market — per symbol, not global (spec addendum).
+  exchange: string;
+  currency: string;
+  benchmarkSymbol: string;
+  /** last ~30 sessions' adjClose, chronological — the table's sparkline. */
+  sparkline: number[] | null;
   quote: {
     price: string | null;
     prevClose: string | null;
@@ -42,6 +52,10 @@ export async function listWatchlist(userId: string): Promise<WatchlistRow[]> {
       thesis: watchlistItems.thesis,
       addedAt: watchlistItems.addedAt,
       mutedUntil: watchlistItems.mutedUntil,
+      positionSize: watchlistItems.positionSize,
+      exchange: symbols.exchange,
+      currency: symbols.currency,
+      benchmarkSymbol: symbols.benchmarkSymbol,
       lastSeenAt: userSymbolState.lastSeenAt,
       price: quotesLatest.price,
       prevClose: quotesLatest.prevClose,
@@ -64,6 +78,8 @@ export async function listWatchlist(userId: string): Promise<WatchlistRow[]> {
     .where(eq(watchlistItems.userId, userId))
     .orderBy(watchlistItems.addedAt);
 
+  const sparklineBySymbol = await loadSparklines(rows.map((r) => r.symbol));
+
   return rows.map((r) => ({
     symbol: r.symbol,
     name: r.name,
@@ -73,6 +89,11 @@ export async function listWatchlist(userId: string): Promise<WatchlistRow[]> {
     addedAt: iso(r.addedAt),
     mutedUntil: r.mutedUntil ? iso(r.mutedUntil) : null,
     lastSeenAt: r.lastSeenAt ? iso(r.lastSeenAt) : null,
+    positionSize: r.positionSize,
+    sparkline: sparklineBySymbol.get(r.symbol) ?? null,
+    exchange: r.exchange,
+    currency: r.currency,
+    benchmarkSymbol: r.benchmarkSymbol,
     quote:
       r.price == null && r.source == null
         ? null
@@ -88,10 +109,41 @@ export async function listWatchlist(userId: string): Promise<WatchlistRow[]> {
   }));
 }
 
+/**
+ * Batched: one query for every watched symbol's sparkline, not one per row —
+ * poll/read cost stays O(distinct symbols), never O(items) (README architecture).
+ */
+async function loadSparklines(symbolList: string[]): Promise<Map<string, number[]>> {
+  const out = new Map<string, number[]>();
+  if (symbolList.length === 0) return out;
+
+  const rows = await db
+    .select({
+      symbol: barsDaily.symbol,
+      sessionDate: barsDaily.sessionDate,
+      adjClose: barsDaily.adjClose,
+    })
+    .from(barsDaily)
+    .where(inArray(barsDaily.symbol, symbolList))
+    .orderBy(asc(barsDaily.sessionDate));
+
+  const bySymbol = new Map<string, number[]>();
+  for (const r of rows) {
+    const arr = bySymbol.get(r.symbol) ?? [];
+    if (r.adjClose != null) arr.push(Number(r.adjClose));
+    bySymbol.set(r.symbol, arr);
+  }
+  for (const [symbol, closes] of bySymbol) {
+    out.set(symbol, closes.slice(-SPARKLINE_SESSIONS));
+  }
+  return out;
+}
+
 export async function addToWatchlist(
   userId: string,
   symbol: string,
   thesis?: string | null,
+  positionSize?: number | null,
 ): Promise<{ added: boolean }> {
   const [sym] = await db
     .select({ symbol: symbols.symbol })
@@ -101,7 +153,12 @@ export async function addToWatchlist(
 
   const inserted = await db
     .insert(watchlistItems)
-    .values({ userId, symbol, thesis: thesis?.trim() || null })
+    .values({
+      userId,
+      symbol,
+      thesis: thesis?.trim() || null,
+      positionSize: positionSize != null ? String(positionSize) : null,
+    })
     .onConflictDoNothing({
       target: [watchlistItems.userId, watchlistItems.symbol],
     })
@@ -131,12 +188,15 @@ export async function removeFromWatchlist(userId: string, symbol: string) {
 export async function updateWatchlistItem(
   userId: string,
   symbol: string,
-  patch: { thesis?: string | null; mutedUntil?: string | null },
+  patch: { thesis?: string | null; mutedUntil?: string | null; positionSize?: number | null },
 ): Promise<boolean> {
   const set: Record<string, unknown> = {};
   if ("thesis" in patch) set.thesis = patch.thesis?.trim() || null;
   if ("mutedUntil" in patch) {
     set.mutedUntil = patch.mutedUntil ? new Date(patch.mutedUntil) : null;
+  }
+  if ("positionSize" in patch) {
+    set.positionSize = patch.positionSize != null ? String(patch.positionSize) : null;
   }
   if (Object.keys(set).length === 0) return false;
 
