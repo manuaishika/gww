@@ -45,6 +45,7 @@ export function DigestView({
           <Card
             key={e.id}
             event={e}
+            windowLabel="in the recent window"
             scale={SCALE[Math.min(i, SCALE.length - 1)]}
             onDismiss={() => onDismiss(e.id)}
             busy={busyId === e.id}
@@ -59,8 +60,7 @@ export function DigestView({
       <div className="rounded-md border border-dashed border-ink/15 px-6 py-10 text-center">
         <p className="text-[15px] text-ink">Quiet. Nothing crossed the bar.</p>
         <p className="mt-1 text-[13px] text-slate">
-          Every move since you last checked stayed inside normal range for its
-          own volatility.
+          Every move {digest.windowLabel} stayed inside its own normal range.
         </p>
       </div>
     );
@@ -72,6 +72,7 @@ export function DigestView({
         <Card
           key={e.id}
           event={e}
+          windowLabel={digest.windowLabel}
           scale={SCALE[Math.min(i, SCALE.length - 1)]}
           onDismiss={() => onDismiss(e.id)}
           busy={busyId === e.id}
@@ -84,11 +85,13 @@ export function DigestView({
 
 function Card({
   event,
+  windowLabel,
   scale,
   onDismiss,
   busy,
 }: {
   event: DigestEvent;
+  windowLabel: string;
   scale: (typeof SCALE)[number];
   onDismiss: () => void;
   busy: boolean;
@@ -152,7 +155,7 @@ function Card({
       {event.sinceLastSeen && (
         <div className="mt-3">
           <p className="text-[12.5px] text-slate">
-            since you checked ({sinceLabel(event.sinceLastSeen.sessions)})
+            {windowLabel} ({sinceLabel(event.sinceLastSeen.sessions)})
             {event.positionBonus > 0 && (
               <span className="ml-2 text-[11px] text-signal">
                 · ranked up {event.positionBonus.toFixed(1)}pt for position size

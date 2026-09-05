@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api-client";
 import { AccountBar } from "./account-bar";
 import { AddSymbol } from "./add-symbol";
@@ -11,7 +11,7 @@ import { Hero } from "./hero";
 import { SymbolDetailProvider } from "./symbol-detail";
 import { TrendingPreview } from "./trending-preview";
 import { WatchlistTable } from "./watchlist-table";
-import type { Digest, WatchlistItem } from "./types";
+import type { Digest, DigestWindow, WatchlistItem } from "./types";
 
 type View = "digest" | "table" | "discover";
 
@@ -24,10 +24,17 @@ export function AppShell() {
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [loadingDemo, setLoadingDemo] = useState(false);
+  const [digestWindow, setDigestWindow] = useState<DigestWindow>("checked");
+  const windowRef = useRef(digestWindow);
+  windowRef.current = digestWindow;
+  const didInit = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      const [d, w] = await Promise.all([api.digest(), api.watchlist()]);
+      const [d, w] = await Promise.all([
+        api.digest(windowRef.current),
+        api.watchlist(),
+      ]);
       setDigest(d);
       setItems(w.items);
       setError(null);
@@ -37,20 +44,22 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
     // ?sync=<code> — from a QR scanned on another device (see AccountBar).
-    // Adopt it, then strip the param so a refresh doesn't re-run it.
     const params = new URLSearchParams(window.location.search);
     const syncCode = params.get("sync");
     if (syncCode) {
       window.history.replaceState({}, "", window.location.pathname);
-      api
-        .adopt(syncCode)
-        .then(() => load())
-        .catch(() => load());
+      api.adopt(syncCode).then(() => load()).catch(() => load());
       return;
     }
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (didInit.current) load();
+  }, [digestWindow, load]);
 
   async function dismiss(eventId: string) {
     setBusyKey(eventId);
@@ -159,7 +168,7 @@ export function AppShell() {
                 Discover
               </TabButton>
             </div>
-            {view === "digest" && digest.headlines.length > 0 && (
+            {view === "digest" && digestWindow === "checked" && digest.headlines.length > 0 && (
               <button
                 type="button"
                 onClick={markAllRead}
@@ -172,7 +181,10 @@ export function AppShell() {
           </div>
 
           {view === "digest" && (
-            <DigestView digest={digest} onDismiss={dismiss} busyId={busyKey} />
+            <>
+              <WindowToggle value={digestWindow} onChange={setDigestWindow} />
+              <DigestView digest={digest} onDismiss={dismiss} busyId={busyKey} />
+            </>
           )}
           {view === "table" && (
             <WatchlistTable
@@ -242,6 +254,41 @@ function FirstRun({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+const WINDOWS: { v: DigestWindow; label: string }[] = [
+  { v: "checked", label: "Since you checked" },
+  { v: 1, label: "Today" },
+  { v: 7, label: "7 days" },
+  { v: 30, label: "30 days" },
+];
+
+function WindowToggle({
+  value,
+  onChange,
+}: {
+  value: DigestWindow;
+  onChange: (w: DigestWindow) => void;
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap gap-1 text-[12px]">
+      {WINDOWS.map(({ v, label }) => (
+        <button
+          key={String(v)}
+          type="button"
+          onClick={() => onChange(v)}
+          className={
+            "rounded-full px-2.5 py-1 transition " +
+            (value === v
+              ? "bg-ink text-paper"
+              : "border border-ink/15 text-slate hover:text-ink")
+          }
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

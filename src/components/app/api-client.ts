@@ -27,7 +27,8 @@ export const api = {
       body: JSON.stringify({ code }),
     }),
 
-  digest: () => req<Digest>("/api/digest"),
+  digest: (window: "checked" | 1 | 7 | 30 = "checked") =>
+    req<Digest>(`/api/digest?window=${window}`),
 
   dataHealth: () => req<DataHealth>("/api/data-health"),
 

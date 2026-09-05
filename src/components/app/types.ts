@@ -78,8 +78,12 @@ export type DigestEvent = {
   chart: SymbolChart | null;
 };
 
+export type DigestWindow = "checked" | 1 | 7 | 30;
+
 export type Digest = {
   accountCode: string;
+  window: DigestWindow;
+  windowLabel: string;
   awayDays: number | null;
   awaySessions: number | null;
   lastCheckedAt: string | null;

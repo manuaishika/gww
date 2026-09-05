@@ -69,8 +69,9 @@ Three claims the product makes:
 
 1. **Magnitude is not materiality.** Every change is normalised against the
    instrument's own recent volatility, not a fixed percentage threshold.
-2. **"Since you last checked" is the only correct baseline** — not 24h, not
-   today's open.
+2. **"Since you last checked" is the only correct *default* baseline** — not
+   24h, not today's open. (A daily / weekly / monthly window is one click away
+   for a deliberate review, but it's never the default — see `DECISIONS.md`.)
 3. **The product's job is to say less.** The digest caps at five. A watchlist
    that surfaces everything has surfaced nothing.
 
@@ -189,7 +190,7 @@ No UI yet — every route below is real and returns JSON.
 | `PATCH /api/watchlist/:symbol` | Edit thesis / mute / position size. |
 | `DELETE /api/watchlist/:symbol` | Remove. |
 | `POST /api/seen` | `{ eventIds }` \| `{ symbol }` \| `{ all }` → advance the watermark. Never called on page load (spec §5). |
-| `GET /api/digest` | The ranked digest — headlines (≤ 5, with the since-you-last-checked decomposition), a collapsed "N smaller changes", and the away-time header. |
+| `GET /api/digest?window=` | The ranked digest — headlines (≤ 5, decomposition, chart), a collapsed "N smaller changes", the away-time header. `window` is `checked` (default, your own watermark), `1`, `7` or `30` sessions for a daily / weekly / monthly review. |
 | `GET /api/data-health` | Global, not per-user: which sources are configured, disputed quotes, circuit-locked symbols (spec §7, optional). |
 | `GET /api/cron/tick` | The ingest tick — polls the union of watched symbols. Guarded by `CRON_SECRET` + `ENABLE_INGEST`; off on the demo, real code (`src/lib/ingest/tick.ts`). |
 | `GET /api/symbols/:symbol` | The bigger picture for one name: quote + provenance, stats, recent events, 90-day chart, your watchlist state. |

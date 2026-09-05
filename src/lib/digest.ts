@@ -14,7 +14,7 @@ import { events as eventsTable, statsDaily, userEventState } from "./db/schema";
 import { listWatchlist, type WatchlistRow } from "./watchlist";
 import { loadBars } from "./detect-run";
 import { computeSignals, type Bar, type SymbolStats } from "./detectors";
-import { lastSession, sessionsBetween } from "./nse-calendar";
+import { allSessions, lastSession, sessionsBetween } from "./nse-calendar";
 import { clusterSectorMoves, type SectorCluster } from "./sector-cluster";
 import { effectiveScore, positionBonus } from "./position-weight";
 
@@ -60,8 +60,18 @@ type Decomposition = {
   companyPct: number;
 };
 
+/**
+ * "checked" — since your own watermark, the default and the product's actual
+ * baseline (spec §1). The numbers are fixed session windows for a deliberate
+ * daily / weekly / monthly review, where "regardless of when I opened the app"
+ * is the right question. The default is never a fixed window.
+ */
+export type DigestWindow = "checked" | 1 | 7 | 30;
+
 export type Digest = {
   accountCode?: string;
+  window: DigestWindow;
+  windowLabel: string;
   awayDays: number | null;
   awaySessions: number | null;
   lastCheckedAt: string | null;
@@ -74,13 +84,26 @@ export type Digest = {
   emptyReason: "no_watchlist" | "all_quiet" | "not_watching_yet" | null;
 };
 
-export async function buildDigest(userId: string): Promise<Digest> {
+const WINDOW_LABEL: Record<string, string> = {
+  checked: "since you last checked",
+  "1": "today",
+  "7": "the last 7 sessions",
+  "30": "the last 30 sessions",
+};
+
+export async function buildDigest(
+  userId: string,
+  window: DigestWindow = "checked",
+): Promise<Digest> {
   const items = await listWatchlist(userId);
   const active = items.filter((i) => i.isActive);
   const bySymbol = new Map(items.map((i) => [i.symbol, i]));
+  const windowLabel = WINDOW_LABEL[String(window)] ?? "since you last checked";
 
   if (items.length === 0) {
     return {
+      window,
+      windowLabel,
       awayDays: null,
       awaySessions: null,
       lastCheckedAt: null,
@@ -91,6 +114,13 @@ export async function buildDigest(userId: string): Promise<Digest> {
       emptyReason: "no_watchlist",
     };
   }
+
+  // fixed-window mode: the baseline is a session date, same for every symbol
+  const sessions = allSessions();
+  const windowStartDate =
+    window === "checked"
+      ? null
+      : sessions[Math.max(0, sessions.length - 1 - Number(window))];
 
   // most recent watermark = the last time the user acknowledged anything
   const seenTimes = items
@@ -142,9 +172,10 @@ export async function buildDigest(userId: string): Promise<Digest> {
         .orderBy(desc(eventsTable.score))
     : [];
 
-  const sinceWatermark = rawEvents.filter((e) => {
+  const inWindow = rawEvents.filter((e) => {
     const item = bySymbol.get(e.symbol);
     if (!item) return false;
+    if (windowStartDate != null) return e.sessionDate >= windowStartDate;
     const wm = item.lastSeenAt ? Date.parse(item.lastSeenAt) : 0;
     return Date.parse(iso(e.detectedAt)) > wm;
   });
@@ -154,7 +185,7 @@ export async function buildDigest(userId: string): Promise<Digest> {
   // to the watchlist's sectors. See DECISIONS.md for a real example found in
   // the seed data.
   const { clusterByRepresentativeId, suppressedEventIds } = clusterSectorMoves(
-    sinceWatermark.map((e) => ({
+    inWindow.map((e) => ({
       id: e.id,
       symbol: e.symbol,
       sessionDate: e.sessionDate,
@@ -163,7 +194,7 @@ export async function buildDigest(userId: string): Promise<Digest> {
     })),
     (symbol) => bySymbol.get(symbol)?.sector,
   );
-  const declustered = sinceWatermark.filter((e) => !suppressedEventIds.has(e.id));
+  const declustered = inWindow.filter((e) => !suppressedEventIds.has(e.id));
 
   // one event per (symbol) for the headline set — ranked by score PLUS the
   // optional position-size nudge (spec addendum) — kept out of the shared
@@ -219,6 +250,10 @@ export async function buildDigest(userId: string): Promise<Digest> {
     const stats = statsBySymbol.get(e.symbol) ?? null;
     const bars = await loadBars(e.symbol);
     const positionSize = num(item.positionSize);
+    // fixed-window mode measures from the window start; "checked" from the
+    // user's own watermark
+    const baseline =
+      windowStartDate ?? (item.lastSeenAt ? item.lastSeenAt.slice(0, 10) : null);
     return {
       id: e.id,
       symbol: e.symbol,
@@ -229,12 +264,12 @@ export async function buildDigest(userId: string): Promise<Digest> {
       score: Number(e.score),
       payload: (e.payload as Record<string, unknown>) ?? {},
       thesis: item.thesis,
-      sinceLastSeen: decompose(e.symbol, item.lastSeenAt, bars, indexBars, stats),
+      sinceLastSeen: decompose(e.symbol, baseline, bars, indexBars, stats),
       sectorCluster: clusterByRepresentativeId.get(e.id) ?? null,
       currency: item.currency,
       positionSize,
       positionBonus: round(positionBonus(positionSize), 1),
-      chart: buildSymbolChart(bars, item.lastSeenAt, stats),
+      chart: buildSymbolChart(bars, baseline, stats),
     };
   };
 
@@ -250,8 +285,9 @@ export async function buildDigest(userId: string): Promise<Digest> {
   // (spec §9's "just-added symbol"), don't show a bare "all quiet" — show
   // what the engine already flagged for these names in the recent window, so
   // the digest is never empty of substance the moment you start watching.
+  // Only in "checked" mode — a fixed window that's empty is just empty.
   const lookback: DigestEvent[] = [];
-  if (headlines.length === 0) {
+  if (headlines.length === 0 && window === "checked") {
     const bestPerSymbol = new Map<string, (typeof rawEvents)[number]>();
     for (const e of [...rawEvents].sort((a, b) => Number(b.score) - Number(a.score))) {
       if (!bestPerSymbol.has(e.symbol)) bestPerSymbol.set(e.symbol, e);
@@ -263,6 +299,8 @@ export async function buildDigest(userId: string): Promise<Digest> {
   }
 
   return {
+    window,
+    windowLabel,
     awayDays,
     awaySessions,
     lastCheckedAt: lastCheckedMs ? new Date(lastCheckedMs).toISOString() : null,

@@ -5,6 +5,23 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### Time windows exist, but the default is never one
+
+Spec §1 claim #2 is "since you last checked is the only correct baseline — not
+24h, not today's open." The digest's default stays exactly that: per-user
+watermark. But "show me everything that hit my watchlist this week, regardless
+of when I opened the app" is a real, deliberate review workflow, and forcing
+*that* through the watermark is also wrong. So the digest has a small window
+toggle — **Since you checked** (default) · **Today** · **7 days** · **30 days**
+— `?window=` on `/api/digest`. In a fixed window: events filter by
+`session_date`, the decomposition measures from the window start (same date
+for every symbol), the hero names the window, and "mark all read" disappears
+(advancing a watermark against a calendar window is meaningless). The
+just-added-symbol `lookback` only runs in "checked" mode — an empty fixed
+window is just empty.
+
+---
+
 ### Green/red is direction only — never scaled by move size
 
 The pitch argues *magnitude is not materiality*, and `SPEC.md` §10 says don't
