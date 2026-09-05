@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api-client";
 import { describeSignal, signalPct } from "./card-copy";
-import { pct } from "./format";
+import { dirText, pct } from "./format";
+import { useSymbolDetail } from "./symbol-detail";
 import type { TrendingItem } from "./types";
 
 /**
@@ -17,6 +18,7 @@ export function TrendingPreview({ onAdded }: { onAdded: () => void }) {
   const [items, setItems] = useState<TrendingItem[] | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  const openDetail = useSymbolDetail();
 
   useEffect(() => {
     api.trending().then((r) => setItems(r.items)).catch(() => setItems([]));
@@ -53,7 +55,13 @@ export function TrendingPreview({ onAdded }: { onAdded: () => void }) {
             >
               <div className="min-w-0">
                 <p className="text-[13.5px] font-medium text-ink">
-                  {item.name}{" "}
+                  <button
+                    type="button"
+                    onClick={() => openDetail(item.symbol)}
+                    className="text-left hover:underline"
+                  >
+                    {item.name}
+                  </button>{" "}
                   <span className="font-normal text-slate">
                     {item.symbol}
                     {item.currency !== "INR" && ` · ${item.currency}`}
@@ -64,8 +72,8 @@ export function TrendingPreview({ onAdded }: { onAdded: () => void }) {
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
-                <span className="whitespace-nowrap text-[13px] font-semibold text-ink">
-                  <span className="mr-1 text-slate" aria-hidden>
+                <span className={`whitespace-nowrap text-[13px] font-semibold ${dirText(headline)}`}>
+                  <span className="mr-1" aria-hidden>
                     {up ? "▲" : "▼"}
                   </span>
                   {pct(headline)}

@@ -192,6 +192,7 @@ No UI yet — every route below is real and returns JSON.
 | `GET /api/digest` | The ranked digest — headlines (≤ 5, with the since-you-last-checked decomposition), a collapsed "N smaller changes", and the away-time header. |
 | `GET /api/data-health` | Global, not per-user: which sources are configured, disputed quotes, circuit-locked symbols (spec §7, optional). |
 | `GET /api/cron/tick` | The ingest tick — polls the union of watched symbols. Guarded by `CRON_SECRET` + `ENABLE_INGEST`; off on the demo, real code (`src/lib/ingest/tick.ts`). |
+| `GET /api/symbols/:symbol` | The bigger picture for one name: quote + provenance, stats, recent events, 90-day chart, your watchlist state. |
 
 `GET /api/digest` after adopting `GRW-24X`:
 
@@ -219,11 +220,17 @@ shape, same digest, different market, no conversion anywhere.
 One page, two views. Design follows spec §10 — the argument is *magnitude is
 not meaning*, so the interface doesn't lead with colour:
 
-- **Hero is the time gap** — "You were away 3 days," not a logo or a ticker grid.
-- **No red/green as the primary channel.** Direction is a small ▲/▼ glyph;
-  **size and weight encode materiality** — the top digest card is visibly
-  larger and heavier than #5, which reads almost like a footnote.
+- **Hero is the time gap** — "3 days away" as a large numeral, not a logo or a
+  ticker grid.
+- **Green/red is direction only, never magnitude.** A 0.3% move and a 12%
+  move get the same green — colour tells you *which way*, the card's size and
+  its materiality bar tell you *whether to care*. That's the distinction the
+  spec (§10) draws when it warns against red-green-*by-percentage*.
 - **Amber is reserved** for stale or disputed data only — nowhere else.
+- **Click a company name anywhere** (digest, table, Discover, trending) → a
+  detail modal: the quote with provenance, computed stats (beta, volatility),
+  every recent detector event with its one-line explanation, the 90-day
+  chart, and your watchlist state with add/remove. `GET /api/symbols/:symbol`.
 - **Card copy is templated**, not generated: `card-copy.ts` turns a detector's
   payload into one sentence (`"+4.1% total — 0.6% was the market, 3.5% was the
   company."`). No LLM (spec §8, `CLAUDE.md`).

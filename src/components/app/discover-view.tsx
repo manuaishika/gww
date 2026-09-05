@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "./api-client";
+import { useSymbolDetail } from "./symbol-detail";
 import { TrendingPreview } from "./trending-preview";
 import type { SectorGroup } from "./types";
 
@@ -14,6 +15,7 @@ export function DiscoverView({ onChanged }: { onChanged: () => void }) {
   const [sectors, setSectors] = useState<SectorGroup[] | null>(null);
   const [openSector, setOpenSector] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const openDetail = useSymbolDetail();
 
   const load = () => api.universe().then((r) => setSectors(r.sectors)).catch(() => setSectors([]));
   useEffect(() => {
@@ -66,7 +68,11 @@ export function DiscoverView({ onChanged }: { onChanged: () => void }) {
                           key={s.symbol}
                           className="flex items-center justify-between py-1.5 text-[13px]"
                         >
-                          <span className="min-w-0 truncate">
+                          <button
+                            type="button"
+                            onClick={() => openDetail(s.symbol)}
+                            className="min-w-0 truncate text-left hover:underline"
+                          >
                             <span className="font-medium text-ink">{s.symbol}</span>
                             <span className="ml-2 text-slate">{s.name}</span>
                             {s.currency !== "INR" && (
@@ -74,7 +80,7 @@ export function DiscoverView({ onChanged }: { onChanged: () => void }) {
                                 {s.exchange}
                               </span>
                             )}
-                          </span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => toggle(s.symbol, s.onWatchlist)}

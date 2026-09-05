@@ -41,7 +41,7 @@ export function ZContextStrip({
         cx={scale(currentZ)}
         cy={midY}
         r={3.2}
-        className="fill-signal"
+        className={currentZ >= 0 ? "fill-gain" : "fill-loss"}
         stroke="var(--paper)"
         strokeWidth={1}
       />

@@ -1,7 +1,7 @@
 /**
  * "Absence chart" (spec addendum) — the last ~60 sessions' price, with the
- * window since you last checked shaded. You see the gap you missed, not just
- * a number describing it. Hand-rolled SVG — see sparkline.tsx for why.
+ * window since you last checked shaded. The line is green / red by its net
+ * direction over the window; the shaded band is where you weren't looking.
  */
 export function AbsenceChart({
   closes,
@@ -32,30 +32,25 @@ export function AbsenceChart({
     ? closes.findIndex((c) => c.date >= watermarkDate)
     : -1;
   const shadeX = shadeStartIdx >= 0 ? x(shadeStartIdx) : null;
+  const up = values[values.length - 1] >= values[0];
 
   return (
     <svg
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className="block w-full"
+      className={`block w-full ${up ? "text-gain" : "text-loss"}`}
       role="img"
       aria-label="Price over the last 60 sessions, with the period since you last checked shaded"
     >
       {shadeX != null && (
-        <rect
-          x={shadeX}
-          y={0}
-          width={width - shadeX}
-          height={height}
-          className="fill-signal/10"
-        />
+        <rect x={shadeX} y={0} width={width - shadeX} height={height} className="fill-signal/10" />
       )}
       <polyline
         points={points.join(" ")}
         fill="none"
-        className="stroke-ink/70"
-        strokeWidth={1.3}
+        stroke="currentColor"
+        strokeWidth={1.4}
         strokeLinecap="round"
         strokeLinejoin="round"
       />

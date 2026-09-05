@@ -126,3 +126,46 @@ export type UniverseSymbol = {
 };
 
 export type SectorGroup = { sector: string; symbols: UniverseSymbol[] };
+
+export type SymbolDetail = {
+  symbol: string;
+  name: string;
+  sector: string | null;
+  exchange: string;
+  currency: string;
+  benchmarkSymbol: string;
+  isActive: boolean;
+  quote: {
+    price: number | null;
+    prevClose: number | null;
+    source: string | null;
+    exchangeTs: string | null;
+    fetchedAt: string | null;
+    circuitState: string | null;
+    isDisputed: boolean | null;
+    disputeNote: string | null;
+  } | null;
+  stats: {
+    sigma60: number | null;
+    beta60: number | null;
+    residSigma60: number | null;
+    high252: number | null;
+    low252: number | null;
+    sessionsAvailable: number | null;
+  } | null;
+  events: {
+    id: string;
+    detector: DigestEvent["detector"];
+    sessionDate: string;
+    z: number;
+    score: number;
+    payload: EventSignals;
+  }[];
+  chart: { date: string; close: number }[];
+  watchlist: {
+    onWatchlist: boolean;
+    thesis: string | null;
+    positionSize: number | null;
+    lastSeenAt: string | null;
+  };
+};

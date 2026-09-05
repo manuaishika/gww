@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { money, pct } from "./format";
+import { dirText, money, pct } from "./format";
 import { Sparkline } from "./sparkline";
 import { StalenessPill } from "./staleness-pill";
+import { useSymbolDetail } from "./symbol-detail";
 import type { WatchlistItem } from "./types";
 
 // No baseline yet — watermark = added_at (spec §9's "just-added symbol").
@@ -81,6 +82,7 @@ function Row({
   onSavePosition: (size: number | null) => void;
   busy: boolean;
 }) {
+  const openDetail = useSymbolDetail();
   const [editingThesis, setEditingThesis] = useState(false);
   const [draft, setDraft] = useState(item.thesis ?? "");
   const [editingPosition, setEditingPosition] = useState(false);
@@ -97,7 +99,13 @@ function Row({
   return (
     <tr className={`border-b border-ink/5 align-top ${item.isActive ? "" : "opacity-50"}`}>
       <td className="px-3 py-2.5">
-        <div className="font-medium text-ink">{item.symbol}</div>
+        <button
+          type="button"
+          onClick={() => openDetail(item.symbol)}
+          className="text-left font-medium text-ink hover:underline"
+        >
+          {item.symbol}
+        </button>
         <div className="text-[12px] text-slate">
           {item.name}
           {item.exchange !== "NSE" && ` · ${item.exchange}`}
@@ -110,8 +118,8 @@ function Row({
         {changePct == null ? (
           "—"
         ) : (
-          <span>
-            <span className="mr-1 text-slate" aria-hidden>
+          <span className={dirText(changePct)}>
+            <span className="mr-1" aria-hidden>
               {changePct >= 0 ? "▲" : "▼"}
             </span>
             {pct(changePct)}

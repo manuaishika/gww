@@ -1,19 +1,16 @@
 /**
- * Hand-rolled inline SVG, no charting library — a sparkline is a handful of
- * line segments, and this keeps the design language consistent with the rest
- * of the app instead of a default library look (spec §10: no gradients, no
- * generic components). One of the 4 cheap charts from the spec addendum.
+ * Hand-rolled inline SVG, no charting library. Colour is direction only —
+ * green if it ended above where it started, red if below, over the window
+ * shown. Not scaled by how far.
  */
 export function Sparkline({
   values,
   width = 72,
   height = 24,
-  color = "currentColor",
 }: {
   values: number[];
   width?: number;
   height?: number;
-  color?: string;
 }) {
   if (values.length < 2) {
     return <span className="text-[11px] text-slate">—</span>;
@@ -37,13 +34,13 @@ export function Sparkline({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className={up ? "text-signal" : "text-slate"}
+      className={up ? "text-gain" : "text-loss"}
       aria-hidden
     >
       <polyline
         points={points.join(" ")}
         fill="none"
-        stroke={color}
+        stroke="currentColor"
         strokeWidth={1.4}
         strokeLinecap="round"
         strokeLinejoin="round"

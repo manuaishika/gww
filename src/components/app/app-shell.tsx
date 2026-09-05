@@ -8,6 +8,7 @@ import { DataHealthPanel } from "./data-health-panel";
 import { DigestView } from "./digest-view";
 import { DiscoverView } from "./discover-view";
 import { Hero } from "./hero";
+import { SymbolDetailProvider } from "./symbol-detail";
 import { TrendingPreview } from "./trending-preview";
 import { WatchlistTable } from "./watchlist-table";
 import type { Digest, WatchlistItem } from "./types";
@@ -126,6 +127,7 @@ export function AppShell() {
   }
 
   return (
+    <SymbolDetailProvider onChanged={load}>
     <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
@@ -194,6 +196,7 @@ export function AppShell() {
         </>
       )}
     </div>
+    </SymbolDetailProvider>
   );
 }
 

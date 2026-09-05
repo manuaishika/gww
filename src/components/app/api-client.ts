@@ -2,6 +2,7 @@ import type {
   DataHealth,
   Digest,
   SectorGroup,
+  SymbolDetail,
   SymbolResult,
   TrendingItem,
   WatchlistItem,
@@ -33,6 +34,9 @@ export const api = {
   trending: () => req<{ items: TrendingItem[] }>("/api/trending"),
 
   universe: () => req<{ sectors: SectorGroup[] }>("/api/universe"),
+
+  symbolDetail: (symbol: string) =>
+    req<SymbolDetail>(`/api/symbols/${encodeURIComponent(symbol)}`),
 
   watchlist: () => req<{ items: WatchlistItem[] }>("/api/watchlist"),
 

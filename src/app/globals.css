@@ -3,12 +3,15 @@
 @tailwind utilities;
 
 :root {
-  /* spec §10 — five values, no gradients */
+  /* spec §10 palette + amber for stale/disputed only */
   --paper: #fbfbf9;
   --ink: #141619;
   --slate: #6b7280;
   --signal: #1b4f9c;
-  --amber: #b45309; /* stale / disputed data ONLY */
+  --amber: #b45309;
+  /* direction only — never scaled by move size */
+  --gain: #15803d;
+  --loss: #b4443a;
 }
 
 html {

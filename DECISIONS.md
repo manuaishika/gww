@@ -5,6 +5,33 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### Green/red is direction only — never scaled by move size
+
+The pitch argues *magnitude is not materiality*, and `SPEC.md` §10 says don't
+make red/green the primary channel — because red-green-*by-percentage* (colour
+intensity mapped to how big the move is) is exactly the mental model that
+makes you think a 5% day is a big deal. So: `gain`/`loss` are two fixed hues,
+muted for the paper ground, applied to the direction glyph, the figures, the
+chart lines, and the decomposition bars. A 0.3% move and a 12% move get the
+*same* green. "How much it matters" is still carried by the card's size and
+the materiality bar. The one-sentence defence: **colour tells you which way,
+size tells you whether to care.**
+
+---
+
+### Click a name → the bigger picture (a detail modal, not a page)
+
+`GET /api/symbols/:symbol` + `symbol-detail.tsx` — one bundle: quote with
+provenance and staleness, computed stats (beta, volatility, sessions of
+data), every recent detector event with its one-line explanation, the 90-day
+price chart, and your own watchlist state (thesis, position, watermark) with
+add/remove. Opened from a React context so a name is clickable everywhere —
+digest cards, the table, Discover, the trending list — without threading a
+callback through four component layers. A modal, not a route, because it's a
+"look closer" gesture, not a place you navigate to and share.
+
+---
+
 ### The ingest tick — one code path, overlap-safe, failure-isolated
 
 `src/lib/ingest/tick.ts` is the backbone under the digest. `runTick()`:

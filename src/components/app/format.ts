@@ -10,6 +10,17 @@ export const signed = (n: number | null | undefined, dp = 1): string => {
 export const pct = (n: number | null | undefined, dp = 1): string =>
   n == null || Number.isNaN(n) ? "—" : `${signed(n, dp)}%`;
 
+/** Direction only — never intensity. Tiny moves and huge moves get the same hue. */
+export const dirText = (n: number | null | undefined): string =>
+  n == null || Number.isNaN(n) || n === 0
+    ? "text-slate"
+    : n > 0
+      ? "text-gain"
+      : "text-loss";
+
+export const dirGlyph = (n: number | null | undefined): string =>
+  n == null || n === 0 ? "·" : n > 0 ? "▲" : "▼";
+
 // Multi-market (spec addendum): currency is per-symbol, never converted.
 // A symbol in USD shows $; INR shows ₹. Materiality (z-scores, %) is
 // currency-free and compares across markets without any of this.

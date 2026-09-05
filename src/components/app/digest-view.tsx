@@ -4,7 +4,8 @@ import { useState } from "react";
 import { AbsenceChart } from "./absence-chart";
 import { headlinePct, whyLine } from "./card-copy";
 import { DecompositionBar } from "./decomposition-bar";
-import { pct } from "./format";
+import { dirText, pct } from "./format";
+import { useSymbolDetail } from "./symbol-detail";
 import { ZContextStrip } from "./z-context-strip";
 import type { Digest, DigestEvent } from "./types";
 
@@ -93,6 +94,7 @@ function Card({
   busy: boolean;
 }) {
   const [showChart, setShowChart] = useState(false);
+  const openDetail = useSymbolDetail();
   const headline = headlinePct(event);
   const up = (headline ?? 0) >= 0;
 
@@ -112,7 +114,13 @@ function Card({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className={`${scale.title} font-semibold leading-snug text-ink`}>
-            {event.name}{" "}
+            <button
+              type="button"
+              onClick={() => openDetail(event.symbol)}
+              className="text-left hover:underline"
+            >
+              {event.name}
+            </button>{" "}
             <span className="font-normal text-slate">
               {event.symbol}
               {event.currency !== "INR" && ` · ${event.currency}`}
@@ -122,8 +130,8 @@ function Card({
         </div>
 
         <div className="flex shrink-0 items-start gap-3">
-          <div className={`${scale.figure} whitespace-nowrap font-semibold text-ink`}>
-            <span className="mr-1 text-slate" aria-hidden>
+          <div className={`${scale.figure} whitespace-nowrap font-semibold ${dirText(headline)}`}>
+            <span className="mr-1" aria-hidden>
               {up ? "▲" : "▼"}
             </span>
             {pct(headline)}
