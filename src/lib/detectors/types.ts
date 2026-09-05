@@ -22,7 +22,15 @@ export type SymbolStats = {
   sessionsAvailable: number;
 };
 
-export type DetectorName = "return_z" | "idio_z" | "volume_z" | "structural";
+export type NewsItem = { eventDate: string; kind: "results" | "headline" };
+
+export type DetectorName =
+  | "return_z"
+  | "idio_z"
+  | "volume_z"
+  | "structural"
+  | "news_density"
+  | "silence";
 
 /** A single detector's output — used by the per-detector functions and their tests. */
 export type DetectorHit = {
@@ -59,6 +67,8 @@ export type EventSignals = {
   structural: string[];
   horizonSessions: number;
   baselineDate: string;
+  newsCount: number | null; // headlines/results in the detection window
+  isSilence: boolean; // a news/results event with no repricing (spec §4.6)
 };
 
 /**
@@ -77,4 +87,7 @@ export type DetectContext = {
   stats: SymbolStats;
   horizonSessions: number;
   circuitState: CircuitState;
+  /** News/results dates up to and including `sessionDate`, ascending. Optional
+   *  detectors (§4.5, §4.6) — an empty array just means neither can fire. */
+  newsEvents: NewsItem[];
 };

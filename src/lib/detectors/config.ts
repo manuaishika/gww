@@ -38,6 +38,18 @@ export const CONFIG = {
   },
 
   /**
+   * News density (§4.5) and silence (§4.6) — optional, Phase 7. There's no
+   * live news feed wired up (would need a key); these read from a small
+   * seeded results calendar. See DECISIONS.md.
+   */
+  news: {
+    densityWindowDays: 7, // count events in the trailing week
+    densityMinCount: 2, // ≥ 2 dated events in a week is unusual on its own
+    silenceWindowDays: 10, // a results/headline event this recently…
+    silenceMaxAbsIdioZ: 0.5, // …with |z_idio| under this counts as "unrepriced"
+  },
+
+  /**
    * score = 100 · sigmoid(Σ wᵢ · featureᵢ)  — spec §4.7
    * Weights are calibrated so the sigmoid works in its responsive range: a
    * lone 2σ idio move ≈ 73, 3σ ≈ 82, 5σ ≈ 92, and co-occurring volume /

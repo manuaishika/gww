@@ -3,12 +3,14 @@ import { computeStats } from "./stats";
 import { computeSignals } from "./signals";
 import {
   detectIdiosyncratic,
+  detectNewsDensity,
   detectReturnZ,
+  detectSilence,
   detectStructural,
   detectSymbol,
   detectVolume,
 } from "./detectors";
-import type { Bar, DetectContext } from "./types";
+import type { Bar, DetectContext, NewsItem } from "./types";
 
 // ─── fixture helpers ────────────────────────────────────────────────────────
 
@@ -22,6 +24,13 @@ function weekdays(n: number, start = "2024-01-01"): string[] {
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return out;
+}
+
+/** `n` calendar days before/after an ISO date (n may be negative). */
+function shiftDate(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 function pricesFromReturns(rets: number[], p0 = 1000): number[] {
@@ -77,6 +86,7 @@ function buildContext(
     stats: over.stats ?? computeStats(bars, indexBars),
     horizonSessions: over.horizonSessions ?? 1,
     circuitState: over.circuitState ?? "none",
+    newsEvents: over.newsEvents ?? [],
   };
 }
 
@@ -347,5 +357,64 @@ describe("detectSymbol: one event per (symbol, session)", () => {
     const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
     const ctx = buildContext(bars, indexBars);
     expect(detectSymbol(ctx)).toBeNull();
+  });
+});
+
+describe("news density detector (spec §4.5)", () => {
+  it("fires on a headline cluster even with no price move", () => {
+    const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
+    const sessionDate = bars.at(-1)!.sessionDate;
+    const newsEvents: NewsItem[] = [
+      { eventDate: shiftDate(sessionDate, -2), kind: "headline" },
+      { eventDate: shiftDate(sessionDate, -5), kind: "headline" },
+    ];
+    const ctx = buildContext(bars, indexBars, { newsEvents });
+    const s = computeSignals(ctx);
+    const event = detectNewsDensity(ctx, s);
+    expect(event).not.toBeNull();
+    expect(event!.payload.newsCountWindow).toBe(2);
+  });
+
+  it("does not fire on a single dated event", () => {
+    const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
+    const sessionDate = bars.at(-1)!.sessionDate;
+    const ctx = buildContext(bars, indexBars, {
+      newsEvents: [{ eventDate: shiftDate(sessionDate, -1), kind: "headline" }],
+    });
+    const s = computeSignals(ctx);
+    expect(detectNewsDensity(ctx, s)).toBeNull();
+  });
+});
+
+describe("silence detector (spec §4.6)", () => {
+  it("fires when a results date passed with no repricing", () => {
+    const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
+    const sessionDate = bars.at(-1)!.sessionDate;
+    const ctx = buildContext(bars, indexBars, {
+      newsEvents: [{ eventDate: shiftDate(sessionDate, -3), kind: "results" }],
+    });
+    const s = computeSignals(ctx);
+    expect(Math.abs(s.zIdio ?? 0)).toBeLessThan(0.5);
+    const event = detectSilence(ctx, s);
+    expect(event).not.toBeNull();
+    expect(event!.payload.daysSinceNews).toBe(3);
+  });
+
+  it("does not fire when the stock DID reprice after results", () => {
+    const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.08, finalIndexRet: 0 });
+    const sessionDate = bars.at(-1)!.sessionDate;
+    const ctx = buildContext(bars, indexBars, {
+      newsEvents: [{ eventDate: shiftDate(sessionDate, -3), kind: "results" }],
+    });
+    const s = computeSignals(ctx);
+    expect(Math.abs(s.zIdio ?? 0)).toBeGreaterThan(2);
+    expect(detectSilence(ctx, s)).toBeNull();
+  });
+
+  it("does not fire without a recent news/results date", () => {
+    const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
+    const ctx = buildContext(bars, indexBars); // no newsEvents at all
+    const s = computeSignals(ctx);
+    expect(detectSilence(ctx, s)).toBeNull();
   });
 });

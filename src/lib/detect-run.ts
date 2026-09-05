@@ -11,6 +11,7 @@ import { db } from "./db";
 import {
   barsDaily,
   events as eventsTable,
+  newsEvents as newsEventsTable,
   quotesLatest,
   statsDaily,
   symbols,
@@ -22,6 +23,7 @@ import {
   suppressedByCooldown,
   type Bar,
   type CircuitState,
+  type NewsItem,
   type SessionEvent,
 } from "./detectors";
 import { NIFTY_SYMBOL } from "./seed-data";
@@ -49,6 +51,15 @@ export async function loadBars(symbol: string): Promise<Bar[]> {
     .where(eq(barsDaily.symbol, symbol))
     .orderBy(asc(barsDaily.sessionDate));
   return rowsToBars(rows);
+}
+
+export async function loadNewsEvents(symbol: string): Promise<NewsItem[]> {
+  const rows = await db
+    .select({ eventDate: newsEventsTable.eventDate, kind: newsEventsTable.kind })
+    .from(newsEventsTable)
+    .where(eq(newsEventsTable.symbol, symbol))
+    .orderBy(asc(newsEventsTable.eventDate));
+  return rows.map((r) => ({ eventDate: r.eventDate, kind: r.kind as NewsItem["kind"] }));
 }
 
 export async function circuitStateOf(symbol: string): Promise<CircuitState> {
@@ -123,31 +134,35 @@ export async function detectForSymbol(
 
   const stats = computeStats(bars, indexBars);
   const circuitState = await circuitStateOf(symbol);
+  const allNews = await loadNewsEvents(symbol);
 
   const firstIdx = Math.max(1, bars.length - lookback);
   const candidates: SessionEvent[] = [];
   for (let i = firstIdx; i < bars.length; i++) {
     const slice = bars.slice(0, i + 1);
+    const sessionDate = bars[i].sessionDate;
     const event = detectSymbol({
       symbol,
-      sessionDate: bars[i].sessionDate,
+      sessionDate,
       bars: slice,
       indexBars,
       stats,
       horizonSessions: 1,
       circuitState,
+      newsEvents: allNews.filter((n) => n.eventDate <= sessionDate),
     });
     if (event) candidates.push(event);
   }
   if (candidates.length === 0) return 0;
 
   // cooldown: drop a candidate if this symbol already fired within the last
-  // `cooldown.sessions` sessions and |z| did not grow enough.
-  const earliest = candidates.reduce(
-    (min, e) => (e.sessionDate < min ? e.sessionDate : min),
-    candidates[0].sessionDate,
-  );
-  const prior = await db
+  // `cooldown.sessions` sessions and |z| did not grow enough. Candidates are
+  // walked in session order and each KEPT one feeds the cooldown window for
+  // the next — checking only against DB rows from a previous run would miss
+  // same-batch repeats entirely on a first-ever backfill (every row is new,
+  // so "prior" would be empty and nothing would ever cool down).
+  const earliest = candidates[0].sessionDate; // candidates is already ascending
+  const priorFromDb = await db
     .select({ sessionDate: eventsTable.sessionDate, z: eventsTable.z })
     .from(eventsTable)
     .where(and(eq(eventsTable.symbol, symbol), gte(eventsTable.sessionDate, earliest)))
@@ -155,18 +170,26 @@ export async function detectForSymbol(
 
   const sessions = bars.map((b) => b.sessionDate);
   const sessionIdx = new Map(sessions.map((d, i) => [d, i]));
-  const kept = candidates.filter((c) => {
+  const recent: { sessionDate: string; z: number }[] = priorFromDb.map((p) => ({
+    sessionDate: p.sessionDate,
+    z: num(p.z),
+  }));
+
+  const kept: SessionEvent[] = [];
+  for (const c of candidates) {
     const ci = sessionIdx.get(c.sessionDate) ?? 0;
     let priorZ: number | null = null;
-    for (const p of prior) {
+    for (const p of recent) {
       const pi = sessionIdx.get(p.sessionDate);
       if (pi == null || pi >= ci) continue;
       if (ci - pi <= CONFIG.cooldown.sessions) {
-        priorZ = Math.max(priorZ ?? 0, Math.abs(num(p.z)));
+        priorZ = Math.max(priorZ ?? 0, Math.abs(p.z));
       }
     }
-    return !suppressedByCooldown(c.z, priorZ);
-  });
+    if (suppressedByCooldown(c.z, priorZ)) continue;
+    kept.push(c);
+    recent.push({ sessionDate: c.sessionDate, z: c.z }); // feeds later iterations
+  }
   if (kept.length === 0) return 0;
 
   const res = await db

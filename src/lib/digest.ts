@@ -227,6 +227,7 @@ async function decompose(
     stats,
     horizonSessions,
     circuitState: "none",
+    newsEvents: [], // this recomputation is for the return decomposition only
   });
 
   if (signals.ret == null) return null;

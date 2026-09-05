@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api-client";
 import { AccountBar } from "./account-bar";
 import { AddSymbol } from "./add-symbol";
+import { DataHealthPanel } from "./data-health-panel";
 import { DigestView } from "./digest-view";
 import { Hero } from "./hero";
 import { WatchlistTable } from "./watchlist-table";
@@ -156,6 +157,8 @@ export function AppShell() {
             <p className="mb-2 text-[13px] font-medium text-ink">Add to your watchlist</p>
             <AddSymbol onAdded={load} />
           </div>
+
+          <DataHealthPanel />
         </>
       )}
     </div>
@@ -182,7 +185,7 @@ function FirstRun({
       <div className="rounded-md border border-ink/10 bg-ink/[0.02] p-5">
         <p className="text-[14px] font-medium text-ink">See it working first</p>
         <p className="mt-1 text-[13px] text-slate">
-          Loads a populated example — 8 NSE stocks, real detector events, theses
+          Loads a populated example — 10 NSE stocks, real detector events, theses
           attached. Account code <code className="rounded-sm bg-ink/5 px-1 py-0.5">{DEMO_CODE}</code>.
         </p>
         <button

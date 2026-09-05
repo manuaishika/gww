@@ -14,7 +14,7 @@ import { join } from "node:path";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { sql } from "drizzle-orm";
-import { barsDaily, quotesLatest, symbols } from "../src/lib/db/schema";
+import { barsDaily, newsEvents, quotesLatest, symbols } from "../src/lib/db/schema";
 import { SEED_SYMBOLS, NIFTY_SYMBOL } from "../src/lib/seed-data";
 
 type SeedBar = { d: string; o: number; h: number; l: number; c: number; ac: number; v: number };
@@ -144,6 +144,39 @@ async function main() {
     .set({ circuitState: "upper" })
     .where(sql`${quotesLatest.symbol} = 'SUNPHARMA'`);
   console.log("✓ staged circuit-limit example: SUNPHARMA at upper circuit");
+
+  // Staged example: a disputed quote (spec §7). No FINNHUB_API_KEY is
+  // configured (see .env.example), so there's no live second source to
+  // actually disagree with the first — the mechanism (is_disputed,
+  // dispute_note, prefer-newer-exchange_ts) is real, but this one flag is
+  // hand-set so the UI's disputed state is demonstrable without a key.
+  await db
+    .update(quotesLatest)
+    .set({
+      isDisputed: true,
+      disputeNote:
+        "Staged (spec §7) — no second source configured (FINNHUB_API_KEY unset). " +
+        "This is what renders when two sources disagree by >0.5%: both shown, " +
+        "the newer exchange_ts wins, and the disagreement is logged rather than hidden.",
+    })
+    .where(sql`${quotesLatest.symbol} = 'INFY'`);
+  console.log("✓ staged disputed-quote example: INFY");
+
+  // ---- news_events ---------------------------------------------------------
+  const newsFile = JSON.parse(
+    readFileSync(join(process.cwd(), "src/lib/seed/news.json"), "utf8"),
+  ) as { events: { symbol: string; eventDate: string; kind: string }[] };
+  await db.delete(newsEvents); // small + fully regenerated each run
+  if (newsFile.events.length > 0) {
+    await db.insert(newsEvents).values(
+      newsFile.events.map((e) => ({
+        symbol: e.symbol,
+        eventDate: e.eventDate,
+        kind: e.kind,
+      })),
+    );
+  }
+  console.log(`✓ ${newsFile.events.length} news/results events (illustrative — see DECISIONS.md)`);
 
   await client.end();
   console.log("\n✓ seed complete");

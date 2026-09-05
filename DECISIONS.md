@@ -5,6 +5,53 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### Cooldown had a real bug: it only checked the DB, not the batch it was in
+
+Found running the news/silence detectors: on a first-ever backfill, the "same
+symbol fired recently, suppress unless |z| grew" check queried `events` in the
+DB *before* the batch started — which is empty on the first run, so nothing
+was ever suppressed within a batch. Harmless-looking for return/idio (they
+rarely repeat on adjacent quiet days), but `silence` exposed it badly: it fired
+on nearly every quiet session for 5-8 sessions in a row after a single results
+date. Fixed in `detect-run.ts` — candidates are now walked in session order
+and each *kept* one feeds the cooldown window for the next, so it's correct on
+a first backfill and an incremental one. Effect: total events dropped from 272
+to 157 on the same seed, and `silence` now fires once per quiet streak instead
+of every day of it. Logged here because it's exactly the kind of bug "resilience
+and edge cases" is supposed to catch, and it was originally missed.
+
+---
+
+### News/silence detectors are staged on real dates, not real news
+
+No live news feed is wired up (see the search-scoping entry below — same
+reasoning: a key would break the no-keys guarantee). `scripts/generate-news.ts`
+writes a small illustrative "results calendar" — one deterministic date per
+symbol, clearly not a real filing calendar — plus two examples placed against
+REAL computed signals, checked by hand before committing them: NESTLEIND's
+idiosyncratic move on 2026-08-27 is ~0.002σ (about as quiet as this dataset
+gets) with a staged results date 7 days earlier, so the silence detector fires
+on real price data, not a fabricated one; WIPRO's 2026-09-03 session has every
+OTHER detector quiet (checked: |z_ret|, |z_idio|, |z_vol| all < 1, no
+structural flags), with two staged headlines in the preceding week, so
+news-density is the only thing that fires that day. Both are unit tested
+independent of the seed (`detectors.test.ts`), and both are also verifiable
+live in the seeded DB — this isn't a UI-only mock, same pattern as the
+circuit-limit and disputed-quote examples.
+
+---
+
+### The 100-word pitch and the LLM narration boundary
+
+`CLAUDE.md` bans LLM calls in this codebase outright — not an oversight, a
+decision, because every number on a card has to trace back to the detector
+engine with nothing in between that could hallucinate a percentage. Phase 8
+lists "LLM narration" as upside; it was not built, on purpose, even after
+being asked to "complete all phases." Template-composed copy
+(`card-copy.ts`) is the whole narration layer, and it stays that way.
+
+---
+
 ### Symbol search is scoped to the seeded universe, not live Yahoo search
 
 `/api/symbols/search` queries the local `symbols` table only. It could instead
@@ -27,6 +74,20 @@ almost nobody else will demonstrate — better to show it working than describe
 it. The volume detector genuinely suppresses itself for that symbol (verified:
 0 `volume_z` events for SUNPHARMA after this went in, vs. others firing
 normally); this isn't a UI-only mock.
+
+---
+
+### Finnhub is a real integration with an expected-null result, plus one staged dispute
+
+`src/lib/ingest/finnhub.ts` and `reconcile.ts` are written against Finnhub's
+real API shape and would work if `FINNHUB_API_KEY` were set — but NSE tickers
+mostly aren't on Finnhub's free tier, so in practice `getFinnhubQuote()`
+returns `null` even with a key, which is exactly the "app works with one
+source" path the code already has to handle (spec §7). Rather than leave the
+disputed-data UI completely unexercised, `INFY`'s quote is flagged
+`is_disputed = true` with a `dispute_note` that says outright it's staged and
+why — same honesty standard as the circuit example, not dressed up as a real
+disagreement between two live feeds.
 
 ---
 

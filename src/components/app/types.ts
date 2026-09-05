@@ -36,6 +36,8 @@ export type EventSignals = {
   structural: string[];
   horizonSessions: number;
   baselineDate: string;
+  newsCount: number | null;
+  isSilence: boolean;
 };
 
 export type Decomposition = {
@@ -49,7 +51,7 @@ export type DigestEvent = {
   id: string;
   symbol: string;
   name: string;
-  detector: "return_z" | "idio_z" | "volume_z" | "structural";
+  detector: "return_z" | "idio_z" | "volume_z" | "structural" | "news_density" | "silence";
   sessionDate: string;
   z: number;
   score: number;
@@ -67,6 +69,14 @@ export type Digest = {
   headlines: DigestEvent[];
   quieter: { count: number; symbols: { symbol: string; count: number }[] };
   emptyReason: "no_watchlist" | "all_quiet" | null;
+};
+
+export type DataHealth = {
+  sources: { primary: string; secondary: string | null };
+  totalQuotes: number;
+  lastFetchedAt: string | null;
+  disputes: { symbol: string; name: string; note: string | null }[];
+  circuitLocked: { symbol: string; name: string; state: string }[];
 };
 
 export type SymbolResult = {

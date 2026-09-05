@@ -1,5 +1,5 @@
 /**
- * The four detectors (spec §4.1–§4.4) and the engine that runs them.
+ * The detectors (spec §4.1–§4.6) and the engine that runs them.
  *
  * Each detector is pure: (ctx, signals) => DetectorHit | null. `signals` is
  * derived purely from `ctx` (one pass, see signals.ts) and passed in so the
@@ -112,14 +112,49 @@ export function detectStructural(
   };
 }
 
+// ─── 4.5 news density (optional) ────────────────────────────────────────────
+export function detectNewsDensity(
+  ctx: DetectContext,
+  s: Signals,
+): DetectorHit | null {
+  if (!s.newsDensityFlag) return null;
+  return {
+    detector: "news_density",
+    z: s.newsCountWindow, // not a z-score — a count, kept for display/debug
+    payload: {
+      newsCountWindow: s.newsCountWindow,
+      windowDays: CONFIG.news.densityWindowDays,
+      returnPct: round(pct(s.ret ?? 0), 2),
+    },
+  };
+}
+
+// ─── 4.6 silence — fires with no price move, that's the point ──────────────
+export function detectSilence(ctx: DetectContext, s: Signals): DetectorHit | null {
+  if (!s.silenceFlag) return null;
+  return {
+    detector: "silence",
+    z: 0, // deliberately: the signal here is the ABSENCE of a move
+    payload: {
+      daysSinceNews: s.daysSinceNews == null ? null : Math.round(s.daysSinceNews),
+      idioZ: s.zIdio == null ? null : round(s.zIdio, 3),
+    },
+  };
+}
+
 export const DETECTORS = [
   detectReturnZ,
   detectIdiosyncratic,
   detectVolume,
   detectStructural,
+  detectNewsDensity,
+  detectSilence,
 ] as const;
 
 // ─── scoring (spec §4.7): score = 100 · sigmoid(Σ wᵢ · featureᵢ) ────────────
+// News/silence are binary flags with a fixed contribution, like structural
+// breaks (spec §4.4's pattern) — there's no natural z-score for "a headline
+// count" or "the absence of a move."
 function sessionScore(s: Signals): number {
   const w = CONFIG.score.weights;
   const volTerm = clamp(
@@ -132,7 +167,7 @@ function sessionScore(s: Signals): number {
     w.ret * Math.max(0, Math.abs(s.zRet ?? 0) - CONFIG.returnZ.notable) +
     w.vol * volTerm +
     w.struct * s.structFlags +
-    w.news * 0; // news detector is Phase 7
+    w.news * Number(s.newsDensityFlag || s.silenceFlag);
   return 100 * sigmoid(sum);
 }
 
@@ -141,6 +176,12 @@ function dominantDetector(hits: DetectorHit[]): DetectorHit {
   // idiosyncratic is "the one that matters" (spec §4.2) whenever it fired
   const idio = hits.find((h) => h.detector === "idio_z");
   if (idio) return idio;
+  // silence can only fire alongside idio when idio didn't cross its own
+  // threshold (§4.6 requires |z_idio| < 0.5), so it never has to compete with
+  // idio for the headline — but it's the most narratively distinctive signal
+  // when present, so it outranks volume/structural/news.
+  const silence = hits.find((h) => h.detector === "silence");
+  if (silence) return silence;
   return [...hits].sort((a, b) => Math.abs(b.z) - Math.abs(a.z))[0];
 }
 
@@ -180,6 +221,8 @@ export function detectSymbol(ctx: DetectContext): SessionEvent | null {
     structural: (structuralHit?.payload.flags as string[]) ?? [],
     horizonSessions: round(signals.horizon, 2),
     baselineDate: signals.baselineDate,
+    newsCount: signals.newsCountWindow > 0 ? signals.newsCountWindow : null,
+    isSilence: signals.silenceFlag,
   };
 
   return {

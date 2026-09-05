@@ -5,14 +5,18 @@
 A diff engine for your NSE watchlist. It answers one question: **what changed
 since you last looked that actually matters, and why should you care?**
 
-> **Status: Phase 5 — submittable.** Scaffold, schema, a live deploy, ~250 real
-> NSE trading sessions, the detector engine (20 unit tests), the full API, the
-> UI (digest cards, table view, add/remove, staleness badges, thesis field),
-> and all 13 edge cases from `SPEC.md` §9. See [`PITCH.md`](./PITCH.md) for the
-> 100-word pitch and [`DECISIONS.md`](./DECISIONS.md) for the "why."
+> **Status: Phase 5 submittable, plus most of 6–7.** Scaffold, schema, a live
+> deploy, ~250 real NSE trading sessions, the detector engine — return z,
+> idiosyncratic z, volume z, structural breaks, news density, silence — with
+> 25 unit tests, the full API, the UI, all 13 edge cases from `SPEC.md` §9, a
+> real (degrading) second-source integration + data health panel, and two
+> detector examples staged against real computed data. **Not built, on
+> purpose:** LLM narration — `CLAUDE.md` bans it outright; see `DECISIONS.md`.
+> See [`PITCH.md`](./PITCH.md) for the pitch, [`DECISIONS.md`](./DECISIONS.md)
+> for the "why," including a real cooldown bug found and fixed along the way.
 >
-> **Fastest way to see it populated:** open the app, click **sync device**,
-> enter `GRW-24X`.
+> **Fastest way to see it populated:** open the app and click **Load the
+> example** (account code `GRW-24X`).
 
 **Live:** https://gww-ten.vercel.app
 
@@ -28,15 +32,18 @@ cd gww
 npm install
 npm run setup     # Postgres + migrations + seed data + detectors + a populated demo account
 npm run dev       # http://localhost:3000
-npm test          # 20 detector / calendar unit tests, no DB needed
+npm test          # 25 detector / calendar unit tests, no DB needed
 ```
 
 `npm run setup` also works against a remote database — set `DATABASE_URL` (e.g. a
 free Neon instance) and it skips Docker.
 
-The seed data (`src/lib/seed/bars.json`, ~670 KB) is committed, so the clone has
-real data with **no API keys**. To regenerate it from source:
-`node scripts/fetch-bars.mjs` (uses yahoo-finance2, which needs no key).
+The seed data (`src/lib/seed/bars.json`, ~670 KB, and `news.json`) is committed,
+so the clone has real data with **no API keys**. Regenerate from source:
+`node scripts/fetch-bars.mjs` (uses yahoo-finance2) and
+`npx tsx scripts/generate-news.ts`. An optional `FINNHUB_API_KEY` (see
+`.env.example`) enables a real second price source — the app is fully
+functional without it.
 
 ---
 
@@ -60,8 +67,9 @@ Three claims the product makes:
 ## How "meaningful" is computed
 
 The engine is `src/lib/detectors/**` — pure functions, no DB, no clock, every
-threshold in `config.ts`. One `computeSignals` pass feeds four detectors and the
-scorer.
+threshold in `config.ts`. One `computeSignals` pass feeds all six detectors and
+the scorer. `detectSymbol` composes ONE event per (symbol, session) — the
+dominant signal headlines it, everything else rides along in the payload.
 
 **1. Return z-score** (`src/lib/detectors` §4.1)
 
@@ -97,11 +105,26 @@ circuit-locked (no two-way market).
 adjusted close), an overnight gap of `|ln(open/prevClose)| / σ₆₀ > 2`, or the
 first 50-DMA cross in ≥ 20 sessions.
 
-**Scoring** (§4.7) — `score = 100 · sigmoid(w_idio·|z_idio| + w_vol·max(0,
-z_vol−1) + w_struct·flags)`. Events dedupe on `symbol:detector:date:floor(|z|)`
-(re-running changes nothing; a real escalation crosses the floor and makes a new
-row), and a `(symbol, detector)` pair can't re-fire within 3 sessions unless
-`|z|` grew by ≥ 1.
+**5. News density** (§4.5) — ≥ 2 dated headlines/results in the trailing 7
+days. Fires with no price move at all; the whole point is a cluster of
+coverage nobody's repriced yet.
+
+**6. Silence — the memorable one** (§4.6) — a results/headline event in the
+last 10 days **and** `|z_idio| < 0.5` since. *"Results were out recently. The
+stock hasn't moved — either the market already knew, or nobody's looked yet."*
+No live news feed is wired up for either of these (would need a key); they run
+against a small committed, clearly-illustrative results calendar — see
+`DECISIONS.md` for the two examples staged against real price data.
+
+**Scoring** (§4.7) — `score = 100 · sigmoid(w_idio·|z_idio| + w_ret·excess_ret
++ w_vol·min(max(0,z_vol−1),6) + w_struct·flags + w_news·(density ∨ silence))`.
+News/silence are binary, fixed-contribution terms like structural flags —
+there's no natural z-score for "a headline count" or "the absence of a move."
+Events dedupe on `symbol:date:floor(|z|)` (re-running changes nothing; a real
+escalation crosses the floor and makes a new row), and a symbol can't re-fire
+within 3 sessions unless its peak `|z|` grew by ≥ 1 — walked session-by-session
+so this holds on a first backfill, not just incrementally (a real bug, found
+and fixed; see `DECISIONS.md`).
 
 ---
 
@@ -120,18 +143,19 @@ No UI yet — every route below is real and returns JSON.
 | `DELETE /api/watchlist/:symbol` | Remove. |
 | `POST /api/seen` | `{ eventIds }` \| `{ symbol }` \| `{ all }` → advance the watermark. Never called on page load (spec §5). |
 | `GET /api/digest` | The ranked digest — headlines (≤ 5, with the since-you-last-checked decomposition), a collapsed "N smaller changes", and the away-time header. |
+| `GET /api/data-health` | Global, not per-user: which sources are configured, disputed quotes, circuit-locked symbols (spec §7, optional). |
 
 `GET /api/digest` after adopting `GRW-24X`:
 
 ```json
 {
-  "awayDays": 36, "awaySessions": 25, "watching": 8,
+  "awayDays": 36, "awaySessions": 25, "watching": 10,
   "headlines": [{
     "symbol": "ADANIENT", "detector": "idio_z", "z": -5.28, "score": 98.9,
     "thesis": "High-beta proxy for the group. In only for the volatility…",
     "sinceLastSeen": { "sessions": 25, "totalPct": -4.86, "marketPct": -2.21, "companyPct": -2.70 }
   }],
-  "quieter": { "count": 78, "symbols": [{ "symbol": "COALINDIA", "count": 14 }] }
+  "quieter": { "count": 53, "symbols": [{ "symbol": "COALINDIA", "count": 9 }] }
 }
 ```
 
@@ -152,12 +176,16 @@ not meaning*, so the interface doesn't lead with colour:
   company."`). No LLM (spec §8, `CLAUDE.md`).
 - **Two empty states, not one** — an empty watchlist says what to do next; a
   quiet watchlist says nothing crossed the bar. Different messages, spec §10.
+- **First run is a real choice, not a blank page** — a brand-new visitor sees
+  "load the example" and "add your own first symbol," side by side, not an
+  empty digest and a search box you have to go hunting for.
 
 `src/components/app/` — `app-shell.tsx` owns data + view state; `digest-view.tsx`,
-`watchlist-table.tsx`, `add-symbol.tsx`, `account-bar.tsx`, `staleness-pill.tsx`
-are presentational. All client-rendered against the API above — there's no
-server-rendered data path yet (a fine trade for a cookie-scoped personal tool;
-see `DECISIONS.md`).
+`watchlist-table.tsx`, `add-symbol.tsx`, `account-bar.tsx`, `staleness-pill.tsx`,
+`data-health-panel.tsx` (collapsed by default — for someone who goes looking,
+not competing with the digest) are presentational. All client-rendered against
+the API above — there's no server-rendered data path yet (a fine trade for a
+cookie-scoped personal tool; see `DECISIONS.md`).
 
 ---
 
@@ -214,8 +242,9 @@ not just asserted in prose.
 | Case | Handling |
 |---|---|
 | Empty vs. quiet watchlist | Two different messages — "add a symbol" (`no_watchlist`) vs. "quiet, nothing crossed the bar" (`all_quiet`) — never one generic empty state. |
-| Disputed / stale data | Amber is the palette's *only* use of that colour (spec §10) — always paired with the reason (lag, source, or circuit state), never a bare tint. |
+| Disputed / stale data | Amber is the palette's *only* use of that colour (spec §10) — always paired with the reason (lag, source, or circuit state), never a bare tint. Staged live: `INFY`'s quote is flagged disputed with an honest note (no live second source is configured). |
 | No database on a fresh deploy | `/` is static and pings `/api/health`, which never throws — a cold Vercel deploy with no `DATABASE_URL` set still renders instead of 500ing. |
+| A second source that's usually unavailable | `getFinnhubQuote()` is a real integration (spec §7) but NSE tickers mostly aren't on Finnhub's free tier — it's written to return `null` gracefully, which is the same "one source" path a missing key takes. Never a hard dependency. |
 
 ---
 
@@ -223,8 +252,12 @@ not just asserted in prose.
 
 Websockets, OAuth, portfolio P&L, options, backtesting, full-page charts, push
 notifications, multiple watchlists. Identity is a 6-character account code, not an
-auth provider. Real-time is polling with a visible "last updated". Naming the cuts
-is a stronger signal than hiding them.
+auth provider. Real-time is polling with a visible "last updated". **LLM
+narration** is explicitly out — `CLAUDE.md` bans it, on the reasoning that every
+number on a card must trace back to the detector engine with nothing in
+between that could hallucinate a percentage; template-composed copy
+(`card-copy.ts`) is the whole narration layer, permanently. Naming the cuts is
+a stronger signal than hiding them.
 
 ---
 

@@ -148,3 +148,23 @@ export const userEventState = pgTable(
     pk: primaryKey({ columns: [t.userId, t.eventId] }),
   }),
 );
+
+/**
+ * Phase 7 (spec §4.5, §4.6) — news density + silence detectors.
+ * Structured event dates, not scraped headline text: no news API is wired up
+ * (would need a key, breaking the no-keys guarantee), so this is seeded from
+ * a small, clearly-illustrative results calendar. See DECISIONS.md.
+ */
+export const newsEvents = pgTable(
+  "news_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    symbol: text("symbol").notNull(),
+    eventDate: date("event_date").notNull(),
+    kind: text("kind").notNull(), // 'results' | 'headline'
+    note: text("note"),
+  },
+  (t) => ({
+    bySymbolDate: index("news_events_symbol_date_idx").on(t.symbol, t.eventDate),
+  }),
+);

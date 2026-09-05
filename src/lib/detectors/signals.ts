@@ -29,6 +29,11 @@ export type Signals = {
   maCrossUp: boolean;
   maCrossDown: boolean;
   structFlags: number;
+
+  newsCountWindow: number; // dated events in the trailing news window
+  newsDensityFlag: boolean; // §4.5
+  daysSinceNews: number | null;
+  silenceFlag: boolean; // §4.6
 };
 
 const indexCloseOn = (
@@ -74,6 +79,10 @@ export function computeSignals(ctx: DetectContext): Signals {
     maCrossUp: false,
     maCrossDown: false,
     structFlags: 0,
+    newsCountWindow: 0,
+    newsDensityFlag: false,
+    daysSinceNews: null,
+    silenceFlag: false,
   };
 
   if (bars.length < 2) return out;
@@ -142,6 +151,28 @@ export function computeSignals(ctx: DetectContext): Signals {
     Number(out.new252Low) +
     Number(out.gap) +
     Number(out.maCrossUp || out.maCrossDown);
+
+  // --- news density (§4.5) & silence (§4.6) ---
+  const sessionMs = Date.parse(ctx.sessionDate);
+  const daysAgo = (d: string) => (sessionMs - Date.parse(d)) / 86_400_000;
+
+  const inDensityWindow = ctx.newsEvents.filter((n) => {
+    const d = daysAgo(n.eventDate);
+    return d >= 0 && d <= CONFIG.news.densityWindowDays;
+  });
+  out.newsCountWindow = inDensityWindow.length;
+  out.newsDensityFlag = inDensityWindow.length >= CONFIG.news.densityMinCount;
+
+  const recentNews = ctx.newsEvents
+    .filter((n) => daysAgo(n.eventDate) >= 0)
+    .sort((a, b) => Date.parse(b.eventDate) - Date.parse(a.eventDate))[0];
+  if (recentNews) out.daysSinceNews = daysAgo(recentNews.eventDate);
+
+  out.silenceFlag =
+    out.daysSinceNews != null &&
+    out.daysSinceNews <= CONFIG.news.silenceWindowDays &&
+    out.zIdio != null &&
+    Math.abs(out.zIdio) < CONFIG.news.silenceMaxAbsIdioZ;
 
   return out;
 }

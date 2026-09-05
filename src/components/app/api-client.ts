@@ -1,4 +1,4 @@
-import type { Digest, SymbolResult, WatchlistItem } from "./types";
+import type { DataHealth, Digest, SymbolResult, WatchlistItem } from "./types";
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -20,6 +20,8 @@ export const api = {
     }),
 
   digest: () => req<Digest>("/api/digest"),
+
+  dataHealth: () => req<DataHealth>("/api/data-health"),
 
   watchlist: () => req<{ items: WatchlistItem[] }>("/api/watchlist"),
 

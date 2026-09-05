@@ -37,6 +37,8 @@ const WATCHLIST: { symbol: string; thesis?: string }[] = [
   { symbol: "INFY" },
   { symbol: "COALINDIA", thesis: "Dividend yield play; watching for a policy-driven re-rating." },
   { symbol: "TATAMOTORS" }, // demerged — exercises the delisted/renamed path
+  { symbol: "NESTLEIND" }, // staged silence example: results w/ no repricing
+  { symbol: "WIPRO" }, // staged news-density example: headline cluster, no move
 ];
 
 async function main() {
@@ -79,8 +81,9 @@ async function main() {
   if (scores.some((s, i) => i > 0 && s > scores[i - 1])) {
     problems.push("headlines not sorted by score desc");
   }
+  const zCanBeZero = new Set(["structural", "silence"]);
   for (const h of digest.headlines) {
-    if (!(h.z !== 0 || h.detector === "structural")) {
+    if (!(h.z !== 0 || zCanBeZero.has(h.detector))) {
       problems.push(`${h.symbol}/${h.detector}: z is 0`);
     }
   }

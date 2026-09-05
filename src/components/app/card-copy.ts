@@ -26,6 +26,12 @@ export function whyLine(e: DigestEvent): string {
       const flags = s.structural.map(flagLabel).join(", ");
       return flags.charAt(0).toUpperCase() + flags.slice(1) + ".";
     }
+    case "news_density": {
+      if (s.newsCount == null) break;
+      return `${s.newsCount} headlines this week, no repricing yet.`;
+    }
+    case "silence":
+      return "Results were out recently. The stock hasn't moved — either the market already knew, or nobody's looked yet.";
   }
   return `${Math.abs(e.z).toFixed(1)}σ move for this stock.`;
 }

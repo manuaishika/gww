@@ -7,6 +7,8 @@ export {
   detectIdiosyncratic,
   detectVolume,
   detectStructural,
+  detectNewsDensity,
+  detectSilence,
   DETECTORS,
 } from "./detectors";
 export { dedupeKey, suppressedByCooldown } from "./dedupe";
@@ -17,6 +19,7 @@ export type {
   DetectorHit,
   DetectorName,
   EventSignals,
+  NewsItem,
   SessionEvent,
   SymbolStats,
 } from "./types";
