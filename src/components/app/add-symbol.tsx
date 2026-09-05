@@ -4,6 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "./api-client";
 import type { SymbolResult } from "./types";
 
+const RECENT_KEY = "wl_recent_symbols";
+
+function loadRecent(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]").slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+function pushRecent(symbol: string) {
+  try {
+    const next = [symbol, ...loadRecent().filter((s) => s !== symbol)].slice(0, 6);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    // localStorage can be unavailable — recents are a convenience, not load-bearing
+  }
+}
+
 export function AddSymbol({ onAdded }: { onAdded: () => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SymbolResult[]>([]);
@@ -12,15 +30,22 @@ export function AddSymbol({ onAdded }: { onAdded: () => void }) {
   const [thesis, setThesis] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [trending, setTrending] = useState<string[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (picked) return;
+    setRecent(loadRecent());
+    api
+      .trending()
+      .then((r) => setTrending(r.items.map((i) => i.symbol).slice(0, 5)))
+      .catch(() => setTrending([]));
+  }, []);
+
+  useEffect(() => {
+    if (picked || !q.trim()) return;
     const t = setTimeout(() => {
-      api
-        .search(q)
-        .then((r) => setResults(r.results))
-        .catch(() => setResults([]));
+      api.search(q).then((r) => setResults(r.results)).catch(() => setResults([]));
     }, 150);
     return () => clearTimeout(t);
   }, [q, picked]);
@@ -39,6 +64,8 @@ export function AddSymbol({ onAdded }: { onAdded: () => void }) {
     setError(null);
     try {
       await api.add(picked.symbol, thesis.trim() || undefined);
+      pushRecent(picked.symbol);
+      setRecent(loadRecent());
       setQ("");
       setPicked(null);
       setThesis("");
@@ -51,6 +78,22 @@ export function AddSymbol({ onAdded }: { onAdded: () => void }) {
     }
   }
 
+  async function quickAdd(symbol: string) {
+    setBusy(true);
+    try {
+      await api.add(symbol);
+      pushRecent(symbol);
+      setRecent(loadRecent());
+      setOpen(false);
+      onAdded();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const showSuggestions =
+    open && !picked && q.trim() === "" && (recent.length > 0 || trending.length > 0);
+
   return (
     <div ref={boxRef} className="relative">
       <div className="flex gap-2">
@@ -62,7 +105,7 @@ export function AddSymbol({ onAdded }: { onAdded: () => void }) {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search an NSE symbol — e.g. RELIANCE, Titan, HDFC Bank"
+          placeholder="Search NSE or US — RELIANCE, Titan, AAPL, Microsoft"
           className="w-full rounded-sm border border-ink/15 bg-paper px-3 py-2 text-[14px] text-ink outline-none focus:border-signal"
         />
         {picked && (
@@ -88,7 +131,18 @@ export function AddSymbol({ onAdded }: { onAdded: () => void }) {
 
       {error && <p className="mt-1 text-[12px] text-amber">{error}</p>}
 
-      {open && !picked && results.length > 0 && (
+      {showSuggestions && (
+        <div className="absolute z-10 mt-1 w-full rounded-sm border border-ink/10 bg-paper p-2 text-[12.5px] shadow-lg">
+          {recent.length > 0 && (
+            <Chips label="recently added" symbols={recent} onPick={quickAdd} busy={busy} />
+          )}
+          {trending.length > 0 && (
+            <Chips label="notable this week" symbols={trending} onPick={quickAdd} busy={busy} />
+          )}
+        </div>
+      )}
+
+      {open && !picked && q.trim() !== "" && results.length > 0 && (
         <ul className="absolute z-10 mt-1 w-full rounded-sm border border-ink/10 bg-paper shadow-lg">
           {results.map((r) => (
             <li key={r.symbol}>
@@ -107,6 +161,37 @@ export function AddSymbol({ onAdded }: { onAdded: () => void }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function Chips({
+  label,
+  symbols,
+  onPick,
+  busy,
+}: {
+  label: string;
+  symbols: string[];
+  onPick: (s: string) => void;
+  busy: boolean;
+}) {
+  return (
+    <div className="px-1 py-1">
+      <p className="mb-1 text-[11px] uppercase tracking-wide text-slate">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {symbols.map((s) => (
+          <button
+            key={s}
+            type="button"
+            disabled={busy}
+            onClick={() => onPick(s)}
+            className="rounded-full border border-ink/15 px-2 py-0.5 text-ink hover:border-signal hover:text-signal disabled:opacity-40"
+          >
+            + {s}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

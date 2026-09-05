@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { api } from "./api-client";
 
 /**
- * Cross-device sync is one text field (spec §6) — no OAuth. `accountCode` is
- * assigned automatically on first visit and remembers THIS watchlist; typing
- * it into another device's sync box loads the same one there.
+ * Cross-device sync without an account system (spec §6: no OAuth). Your code
+ * is assigned on first visit and remembers THIS watchlist. To get it onto
+ * another device you don't have to type or remember anything — scan the QR
+ * with your phone camera and it opens the app already synced (the QR is a URL
+ * with `?sync=<code>`, which AppShell adopts on load).
  */
 export function AccountBar({
   accountCode,
@@ -20,6 +23,15 @@ export function AccountBar({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [qr, setQr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || qr) return;
+    const url = `${window.location.origin}/?sync=${encodeURIComponent(accountCode)}`;
+    QRCode.toDataURL(url, { margin: 1, width: 132 })
+      .then(setQr)
+      .catch(() => setQr(null));
+  }, [open, qr, accountCode]);
 
   async function submit() {
     setBusy(true);
@@ -63,33 +75,42 @@ export function AccountBar({
           className="text-signal hover:underline"
           onClick={() => setOpen((v) => !v)}
         >
-          use on another device
+          open on another device
         </button>
       </div>
+
       {open && (
-        <div className="flex max-w-[280px] flex-col items-end gap-1.5">
-          <p className="text-right text-slate">
-            On your other device, open this app and enter{" "}
-            <span className="font-medium text-ink">{accountCode}</span> below
-            to see this same watchlist there.
+        <div className="flex w-[240px] flex-col items-end gap-2 rounded-sm border border-ink/10 bg-paper p-3">
+          <p className="text-right text-[12px] text-slate">
+            Scan with your phone camera — it opens this same watchlist there.
+            Nothing to type or remember.
           </p>
-          <div className="flex items-center gap-2">
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="enter a code"
-              className="w-32 rounded-sm border border-ink/15 bg-paper px-2 py-1 text-[12.5px] uppercase text-ink outline-none focus:border-signal"
-            />
-            <button
-              type="button"
-              onClick={submit}
-              disabled={busy || code.trim().length < 6}
-              className="text-signal hover:underline disabled:opacity-40"
-            >
-              {busy ? "…" : "switch to it"}
-            </button>
-          </div>
-          {error && <span className="text-amber">{error}</span>}
+          {qr ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qr} alt={`QR to sync account ${accountCode}`} width={132} height={132} />
+          ) : (
+            <div className="h-[132px] w-[132px] animate-pulse rounded-sm bg-ink/5" />
+          )}
+          <details className="w-full text-[11.5px] text-slate">
+            <summary className="cursor-pointer hover:text-ink">or type the code</summary>
+            <div className="mt-1.5 flex items-center gap-2">
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="paste a code"
+                className="w-28 rounded-sm border border-ink/15 bg-paper px-2 py-1 uppercase text-ink outline-none focus:border-signal"
+              />
+              <button
+                type="button"
+                onClick={submit}
+                disabled={busy || code.trim().length < 6}
+                className="text-signal hover:underline disabled:opacity-40"
+              >
+                {busy ? "…" : "switch"}
+              </button>
+            </div>
+            {error && <p className="mt-1 text-amber">{error}</p>}
+          </details>
         </div>
       )}
     </div>

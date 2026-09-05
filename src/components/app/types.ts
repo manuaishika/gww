@@ -85,8 +85,9 @@ export type Digest = {
   lastCheckedAt: string | null;
   watching: number;
   headlines: DigestEvent[];
+  lookback: DigestEvent[];
   quieter: { count: number; symbols: { symbol: string; count: number }[] };
-  emptyReason: "no_watchlist" | "all_quiet" | null;
+  emptyReason: "no_watchlist" | "all_quiet" | "not_watching_yet" | null;
 };
 
 export type DataHealth = {
@@ -115,3 +116,13 @@ export type SymbolResult = {
   sector: string | null;
   isActive: boolean;
 };
+
+export type UniverseSymbol = {
+  symbol: string;
+  name: string;
+  currency: string;
+  exchange: string;
+  onWatchlist: boolean;
+};
+
+export type SectorGroup = { sector: string; symbols: UniverseSymbol[] };

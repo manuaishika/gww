@@ -67,8 +67,11 @@ export type Digest = {
   lastCheckedAt: string | null;
   watching: number;
   headlines: DigestEvent[];
+  /** shown only when `headlines` is empty because you just started watching —
+   *  what the engine already flagged for these names in the recent window. */
+  lookback: DigestEvent[];
   quieter: { count: number; symbols: { symbol: string; count: number }[] };
-  emptyReason: "no_watchlist" | "all_quiet" | null;
+  emptyReason: "no_watchlist" | "all_quiet" | "not_watching_yet" | null;
 };
 
 export async function buildDigest(userId: string): Promise<Digest> {
@@ -83,6 +86,7 @@ export async function buildDigest(userId: string): Promise<Digest> {
       lastCheckedAt: null,
       watching: 0,
       headlines: [],
+      lookback: [],
       quieter: { count: 0, symbols: [] },
       emptyReason: "no_watchlist",
     };
@@ -207,16 +211,15 @@ export async function buildDigest(userId: string): Promise<Digest> {
     : [];
   const statsBySymbol = new Map(statsRows.map((s) => [s.symbol, toStats(s)]));
 
-  const headlines: DigestEvent[] = [];
-  for (const e of headlineRows) {
+  const toCard = async (
+    e: (typeof rawEvents)[number],
+  ): Promise<DigestEvent> => {
     const item = bySymbol.get(e.symbol)!;
     const indexBars = await getBenchmarkBars(item.benchmarkSymbol);
     const stats = statsBySymbol.get(e.symbol) ?? null;
     const bars = await loadBars(e.symbol);
-    const decomposition = decompose(e.symbol, item.lastSeenAt, bars, indexBars, stats);
-    const chart = buildSymbolChart(bars, item.lastSeenAt, stats);
     const positionSize = num(item.positionSize);
-    headlines.push({
+    return {
       id: e.id,
       symbol: e.symbol,
       name: item.name,
@@ -226,18 +229,37 @@ export async function buildDigest(userId: string): Promise<Digest> {
       score: Number(e.score),
       payload: (e.payload as Record<string, unknown>) ?? {},
       thesis: item.thesis,
-      sinceLastSeen: decomposition,
+      sinceLastSeen: decompose(e.symbol, item.lastSeenAt, bars, indexBars, stats),
       sectorCluster: clusterByRepresentativeId.get(e.id) ?? null,
       currency: item.currency,
       positionSize,
       positionBonus: round(positionBonus(positionSize), 1),
-      chart,
-    });
-  }
+      chart: buildSymbolChart(bars, item.lastSeenAt, stats),
+    };
+  };
+
+  const headlines: DigestEvent[] = [];
+  for (const e of headlineRows) headlines.push(await toCard(e));
 
   const quieterBySymbol = new Map<string, number>();
   for (const e of rest) {
     quieterBySymbol.set(e.symbol, (quieterBySymbol.get(e.symbol) ?? 0) + 1);
+  }
+
+  // Nothing since the watermark? If it's because everything was just added
+  // (spec §9's "just-added symbol"), don't show a bare "all quiet" — show
+  // what the engine already flagged for these names in the recent window, so
+  // the digest is never empty of substance the moment you start watching.
+  const lookback: DigestEvent[] = [];
+  if (headlines.length === 0) {
+    const bestPerSymbol = new Map<string, (typeof rawEvents)[number]>();
+    for (const e of [...rawEvents].sort((a, b) => Number(b.score) - Number(a.score))) {
+      if (!bestPerSymbol.has(e.symbol)) bestPerSymbol.set(e.symbol, e);
+    }
+    const top = [...bestPerSymbol.values()]
+      .sort((a, b) => Number(b.score) - Number(a.score))
+      .slice(0, 5);
+    for (const e of top) lookback.push(await toCard(e));
   }
 
   return {
@@ -246,6 +268,7 @@ export async function buildDigest(userId: string): Promise<Digest> {
     lastCheckedAt: lastCheckedMs ? new Date(lastCheckedMs).toISOString() : null,
     watching: items.length,
     headlines,
+    lookback,
     quieter: {
       count: rest.length,
       symbols: [...quieterBySymbol.entries()]
@@ -254,9 +277,11 @@ export async function buildDigest(userId: string): Promise<Digest> {
     },
     emptyReason:
       headlines.length === 0
-        ? oldestWatermark == null
-          ? null
-          : "all_quiet"
+        ? lookback.length > 0
+          ? "not_watching_yet"
+          : oldestWatermark == null
+            ? null
+            : "all_quiet"
         : null,
   };
 }

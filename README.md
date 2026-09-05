@@ -183,6 +183,7 @@ No UI yet — every route below is real and returns JSON.
 | `POST /api/session/adopt` | `{ code }` → adopt that account on this device (spec §6). |
 | `GET /api/symbols/search?q=` | Local symbol search across every seeded market. |
 | `GET /api/trending` | Global, no session needed: what the detector actually found recently, across everyone's shared symbols. What a brand-new visitor sees first. |
+| `GET /api/universe` | Every watchable symbol grouped by sector, with a per-user "already watching" flag — the Discover tab's browse view. |
 | `GET /api/watchlist` | Items with thesis, position size, watermark, latest quote, currency, sparkline. |
 | `POST /api/watchlist` | `{ symbol, thesis?, positionSize? }` → add. Watermark = now ("watching from today"). |
 | `PATCH /api/watchlist/:symbol` | Edit thesis / mute / position size. |
@@ -225,14 +226,18 @@ not meaning*, so the interface doesn't lead with colour:
 - **Card copy is templated**, not generated: `card-copy.ts` turns a detector's
   payload into one sentence (`"+4.1% total — 0.6% was the market, 3.5% was the
   company."`). No LLM (spec §8, `CLAUDE.md`).
-- **Two empty states, not one** — an empty watchlist says what to do next; a
-  quiet watchlist says nothing crossed the bar. Different messages, spec §10.
-- **First run shows real data, not just buttons** — `GET /api/trending`
-  (`src/lib/trending.ts`) surfaces the detector engine's own recent output
-  across the whole universe, un-personalized, no session required, with a
-  one-click "+ watch" per item — above "load the example" and "add your own,"
-  side by side. Not a blank page, not a page that only describes what the
-  product would show you if you did something first.
+- **Three empty states, not one** — no watchlist ("add a symbol"), just-added
+  ("nothing since — here's the recent history," a `lookback` set of real
+  events), and genuinely quiet ("every move stayed inside its own range").
+- **Discover tab** — always there (not just the first screen): the trending
+  list (`GET /api/trending`, global, no session — the detector's own recent
+  output across the whole universe) plus browse-by-sector (`GET /api/universe`,
+  sectors → companies, "+ watch" inline). The search box has a dropdown on
+  empty focus: recently added + notable this week.
+- **Cross-device is a QR code** — the account bar renders a QR of
+  `<origin>/?sync=<code>`; scan it with a phone camera and the app opens
+  already synced. No email provider (would break the no-keys guarantee), no
+  remembering a string.
 - **Four cheap charts, hand-rolled SVG, no charting library** (spec addendum —
   deviates from the original Recharts-for-sparklines decision; see
   `DECISIONS.md` for why). Every headline card, collapsed behind a "show

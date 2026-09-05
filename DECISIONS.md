@@ -5,6 +5,42 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### The digest is never empty of substance the moment you start watching
+
+Real complaint: "my watchlist is there but the digest shows nothing." Correct
+behaviour — a symbol added five minutes ago has a watermark of "now," so
+nothing's happened *since* — but it reads as broken. `buildDigest` now returns
+a `lookback` set when `headlines` is empty: the top event per watched symbol
+regardless of watermark, shown under "you just started watching these — here's
+what the engine flagged for them in the last few weeks." Clearly labelled as
+pre-watching history, not a live diff. `emptyReason: "not_watching_yet"`.
+
+---
+
+### Discover is a real tab, not just the first-run screen
+
+The trending preview only rendered when `watching === 0`, so anyone with a
+watchlist never saw it — and there was no way back to it. Now a third tab
+(Discover) alongside Digest / Table, always there: the trending list plus
+browse-by-sector (`/api/universe`, sectors → companies, "+ watch" / "remove"
+inline). The search box also grew a dropdown on empty focus — recently added
+(localStorage) and notable-this-week (from `/api/trending`).
+
+---
+
+### Cross-device sync is a QR code, not a remembered string
+
+"How do I know which device, do I have to remember the code" — fair. Real
+email verification needs an email provider (an API key), which breaks the
+no-keys guarantee. The QR does it with zero external dependency: the account
+bar renders a QR of `<origin>/?sync=<code>`; scan it with a phone camera and
+the app opens already synced (AppShell reads `?sync=` on load, adopts, strips
+the param). Typing the code is still there, folded into a `<details>`. The
+placeholder was `K7M-2QX` — spec's own example — which read as a real code to
+try; it's now generic, and your own code is a copy-to-clipboard button.
+
+---
+
 ### The first screen shows real data, not just buttons
 
 The first-run fix (two options: load the demo, or add your own) was still two

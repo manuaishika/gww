@@ -6,12 +6,13 @@ import { AccountBar } from "./account-bar";
 import { AddSymbol } from "./add-symbol";
 import { DataHealthPanel } from "./data-health-panel";
 import { DigestView } from "./digest-view";
+import { DiscoverView } from "./discover-view";
 import { Hero } from "./hero";
 import { TrendingPreview } from "./trending-preview";
 import { WatchlistTable } from "./watchlist-table";
 import type { Digest, WatchlistItem } from "./types";
 
-type View = "digest" | "table";
+type View = "digest" | "table" | "discover";
 
 const DEMO_CODE = "GRW-24X";
 
@@ -35,6 +36,18 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
+    // ?sync=<code> — from a QR scanned on another device (see AccountBar).
+    // Adopt it, then strip the param so a refresh doesn't re-run it.
+    const params = new URLSearchParams(window.location.search);
+    const syncCode = params.get("sync");
+    if (syncCode) {
+      window.history.replaceState({}, "", window.location.pathname);
+      api
+        .adopt(syncCode)
+        .then(() => load())
+        .catch(() => load());
+      return;
+    }
     load();
   }, [load]);
 
@@ -114,10 +127,15 @@ export function AppShell() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <p className="text-[13px] font-medium uppercase tracking-wide text-slate">
-          Smart Market Watchlist
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[14px] font-semibold tracking-tight text-ink">
+            Smart Market Watchlist
+          </p>
+          <p className="text-[12px] text-slate">
+            what moved that matters, since you last looked
+          </p>
+        </div>
         <AccountBar accountCode={digest.accountCode} onSynced={load} />
       </div>
 
@@ -135,6 +153,9 @@ export function AppShell() {
               <TabButton active={view === "table"} onClick={() => setView("table")}>
                 Table ({items.length})
               </TabButton>
+              <TabButton active={view === "discover"} onClick={() => setView("discover")}>
+                Discover
+              </TabButton>
             </div>
             {view === "digest" && digest.headlines.length > 0 && (
               <button
@@ -148,9 +169,10 @@ export function AppShell() {
             )}
           </div>
 
-          {view === "digest" ? (
+          {view === "digest" && (
             <DigestView digest={digest} onDismiss={dismiss} busyId={busyKey} />
-          ) : (
+          )}
+          {view === "table" && (
             <WatchlistTable
               items={items}
               onRemove={remove}
@@ -159,11 +181,14 @@ export function AppShell() {
               busySymbol={busyKey}
             />
           )}
+          {view === "discover" && <DiscoverView onChanged={load} />}
 
-          <div className="mt-10 border-t border-ink/10 pt-6">
-            <p className="mb-2 text-[13px] font-medium text-ink">Add to your watchlist</p>
-            <AddSymbol onAdded={load} />
-          </div>
+          {view !== "discover" && (
+            <div className="mt-10 border-t border-ink/10 pt-6">
+              <p className="mb-2 text-[13px] font-medium text-ink">Add to your watchlist</p>
+              <AddSymbol onAdded={load} />
+            </div>
+          )}
 
           <DataHealthPanel />
         </>

@@ -11,11 +11,11 @@ import type { Digest, DigestEvent } from "./types";
 // Weight and position encode materiality (spec §10) — the top card is larger
 // and heavier; by rank 3-4 it's reading like a footnote, not a duplicate card.
 const SCALE = [
-  { title: "text-2xl sm:text-[26px]", pad: "p-6", accent: "border-l-[3px] border-signal", figure: "text-2xl" },
-  { title: "text-xl", pad: "p-5", accent: "border-l-2 border-signal/60", figure: "text-xl" },
-  { title: "text-lg", pad: "p-4", accent: "border-l border-ink/15", figure: "text-lg" },
-  { title: "text-base", pad: "p-4", accent: "border-l border-ink/15", figure: "text-base" },
-  { title: "text-base", pad: "p-3.5", accent: "border-l border-ink/10", figure: "text-base" },
+  { title: "text-2xl sm:text-[26px]", pad: "p-6", accent: "border-l-[3px] border-signal", figure: "text-2xl", bg: "bg-signal/[0.035]" },
+  { title: "text-xl", pad: "p-5", accent: "border-l-2 border-signal/60", figure: "text-xl", bg: "bg-paper" },
+  { title: "text-lg", pad: "p-4", accent: "border-l border-ink/15", figure: "text-lg", bg: "bg-paper" },
+  { title: "text-base", pad: "p-4", accent: "border-l border-ink/15", figure: "text-base", bg: "bg-paper" },
+  { title: "text-base", pad: "p-3.5", accent: "border-l border-ink/10", figure: "text-base", bg: "bg-paper" },
 ] as const;
 
 export function DigestView({
@@ -28,6 +28,30 @@ export function DigestView({
   busyId: string | null;
 }) {
   if (digest.watching === 0) return null;
+
+  // Just started watching — nothing has happened "since," so show what the
+  // engine already flagged for these names recently, clearly labelled.
+  if (digest.headlines.length === 0 && digest.lookback.length > 0) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-md border border-dashed border-ink/15 px-4 py-3">
+          <p className="text-[13.5px] text-ink">
+            You just started watching these. Nothing has happened <em>since</em>{" "}
+            &mdash; here is what the engine flagged for them in the last few weeks.
+          </p>
+        </div>
+        {digest.lookback.map((e, i) => (
+          <Card
+            key={e.id}
+            event={e}
+            scale={SCALE[Math.min(i, SCALE.length - 1)]}
+            onDismiss={() => onDismiss(e.id)}
+            busy={busyId === e.id}
+          />
+        ))}
+      </div>
+    );
+  }
 
   if (digest.headlines.length === 0) {
     return (
@@ -74,8 +98,17 @@ function Card({
 
   return (
     <article
-      className={`rounded-sm bg-paper ${scale.accent} ${scale.pad} shadow-[0_1px_0_rgba(20,22,25,0.06)]`}
+      className={`overflow-hidden rounded-sm ${scale.bg} ${scale.accent} ${scale.pad} shadow-[0_1px_0_rgba(20,22,25,0.06)]`}
     >
+      {/* materiality, as a thin bar — spec §10: weight encodes how much it matters */}
+      <div className="mb-2.5 h-[3px] w-full rounded-full bg-ink/[0.06]">
+        <div
+          className="h-full rounded-full bg-signal/70"
+          style={{ width: `${Math.max(4, Math.min(100, event.score))}%` }}
+          aria-hidden
+        />
+      </div>
+
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className={`${scale.title} font-semibold leading-snug text-ink`}>
