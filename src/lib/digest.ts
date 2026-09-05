@@ -16,9 +16,12 @@ import { loadBars } from "./detect-run";
 import { NIFTY_SYMBOL } from "./seed-data";
 import { computeSignals, type Bar, type SymbolStats } from "./detectors";
 import { lastSession, sessionsBetween } from "./nse-calendar";
+import { clusterSectorMoves, type SectorCluster } from "./sector-cluster";
 
 const MS_DAY = 86_400_000;
 const num = (v: string | null): number | null => (v == null ? null : Number(v));
+
+export type { SectorCluster };
 
 export type DigestEvent = {
   id: string;
@@ -31,6 +34,9 @@ export type DigestEvent = {
   payload: Record<string, unknown>;
   thesis: string | null;
   sinceLastSeen: Decomposition | null;
+  /** ≥3 watched symbols in the same sector fired idio_z the same session —
+   *  see buildDigest for why that's a model limitation, not 3 separate stories. */
+  sectorCluster: SectorCluster | null;
 };
 
 type Decomposition = {
@@ -125,12 +131,26 @@ export async function buildDigest(userId: string): Promise<Digest> {
     return Date.parse(iso(e.detectedAt)) > wm;
   });
 
+  // sector clustering — an honest correction for a one-factor model. Pure
+  // logic lives in sector-cluster.ts (unit tested there); this just wires it
+  // to the watchlist's sectors. See DECISIONS.md for a real example found in
+  // the seed data.
+  const { clusterByRepresentativeId, suppressedEventIds } = clusterSectorMoves(
+    sinceWatermark.map((e) => ({
+      id: e.id,
+      symbol: e.symbol,
+      sessionDate: e.sessionDate,
+      detector: e.detector,
+      score: Number(e.score),
+    })),
+    (symbol) => bySymbol.get(symbol)?.sector,
+  );
+  const declustered = sinceWatermark.filter((e) => !suppressedEventIds.has(e.id));
+
   // one event per (symbol) for the headline set — the highest-scoring —
   // keeping the rest for the collapsed count
   const seenSymbol = new Set<string>();
-  const ranked = [...sinceWatermark].sort(
-    (a, b) => Number(b.score) - Number(a.score),
-  );
+  const ranked = [...declustered].sort((a, b) => Number(b.score) - Number(a.score));
   const primary: typeof ranked = [];
   const secondary: typeof ranked = [];
   for (const e of ranked) {
@@ -174,6 +194,7 @@ export async function buildDigest(userId: string): Promise<Digest> {
       payload: (e.payload as Record<string, unknown>) ?? {},
       thesis: item.thesis,
       sinceLastSeen: decomposition,
+      sectorCluster: clusterByRepresentativeId.get(e.id) ?? null,
     });
   }
 

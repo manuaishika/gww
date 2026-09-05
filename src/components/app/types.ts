@@ -47,6 +47,8 @@ export type Decomposition = {
   companyPct: number;
 };
 
+export type SectorCluster = { sector: string; symbols: string[] };
+
 export type DigestEvent = {
   id: string;
   symbol: string;
@@ -58,6 +60,7 @@ export type DigestEvent = {
   payload: EventSignals;
   thesis: string | null;
   sinceLastSeen: Decomposition | null;
+  sectorCluster: SectorCluster | null;
 };
 
 export type Digest = {

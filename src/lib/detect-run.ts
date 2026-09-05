@@ -28,6 +28,16 @@ import {
 } from "./detectors";
 import { NIFTY_SYMBOL } from "./seed-data";
 
+// NSE closes at 15:30 IST = 10:00:00Z. A live cron runs shortly after close,
+// so this is what `detected_at` would genuinely be — matters because a
+// backfill that stamps every historical row with "right now" makes the
+// digest's `detected_at > last_seen_at` filter (spec §5) meaningless: every
+// row looks "just detected" regardless of the session it's actually from,
+// and a watermark set to any date before the backfill ran would (wrongly)
+// surface the entire history as new. Found while testing the sector-cluster
+// feature against a real event from months back — see DECISIONS.md.
+const sessionCloseTs = (sessionDate: string) => new Date(`${sessionDate}T10:00:00.000Z`);
+
 const num = (v: string | null): number => (v == null ? NaN : Number(v));
 
 function rowsToBars(
@@ -203,7 +213,7 @@ export async function detectForSymbol(
         score: e.score.toString(),
         z: e.z.toString(),
         payload: e.signals,
-        detectedAt: new Date(),
+        detectedAt: sessionCloseTs(e.sessionDate),
       })),
     )
     .onConflictDoNothing({ target: eventsTable.dedupeKey })

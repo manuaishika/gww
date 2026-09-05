@@ -5,6 +5,56 @@ Appended as decisions are made, not reconstructed at the end.
 
 ---
 
+### Sector clustering: the one-factor model's honest blind spot
+
+`idio_z` strips out NIFTY, not the sector — it's a single-factor model
+(market only), the same simplification CAPM makes before Fama-French adds
+size/value factors. If ≥3 watched symbols in the SAME sector fire `idio_z` on
+the SAME session, that isn't 3 independent company stories; it's a sector-wide
+factor the model can't separate from true company-specific news, and
+presenting all 3 as separately "company-specific" would overclaim precision
+the model doesn't have. `src/lib/sector-cluster.ts` groups these (pure, unit
+tested — 5 cases including the exact real example below) and the digest
+collapses them into one card naming the others, instead of letting a single
+sector event eat multiple of the 5 headline slots.
+
+**Real example, not fabricated**: scanning the full ~250-session seed history
+(`npm run detect -- 220`) surfaces `TCS`, `INFY`, `WIPRO`, `HCLTECH` all firing
+`idio_z` on **2026-02-12** — a genuine same-day, same-sector quadruple in
+unmodified NSE data, almost certainly an IT-sector-wide move (currency, rate
+guidance, or similar). It's outside the default 45-session operational window
+and the demo account's realistic ~25-session absence, so it won't appear live
+in `GRW-24X` — forcing it in would mean either an unrealistic year-long demo
+watermark (fighting the very-long-absence cap that exists for a reason) or
+fabricating price data to recreate it recently, and both are worse than
+proving the mechanism at the unit level against the real event and saying so
+here. Reproduce it directly: `npm run detect -- 220` then
+`select session_date, count(*), array_agg(symbol) from events e join symbols s
+using (symbol) where detector='idio_z' group by 1 having count(*) >= 3`.
+
+---
+
+### `detected_at` for backfilled events must be the session's close, not "now"
+
+Real bug, found while trying to verify the sector cluster above end-to-end.
+Spec §5 says the digest reads `events where detected_at > last_seen_at`. In a
+live system `detected_at` ≈ when the daily cron ran, so it naturally tracks
+"did this happen after I last checked." But the seed data is backfilled in one
+batch — every historical row was originally stamped `detected_at = new
+Date()`, i.e. the moment `npm run detect` happened to run, regardless of which
+of the last 45 sessions it was actually from. Every row looked "just
+detected," so the "since watermark" filter was accidentally permissive —
+correct-looking only because the `events` table itself was bounded to a
+45-session backfill window, not because the filter was doing real work. A
+watermark set anywhere inside that window would have shown the *entire*
+window as unread, not just what came after it. Fixed in `detect-run.ts`:
+backfilled rows now get `detected_at` = their session's real close time
+(15:30 IST). Visible effect on the same seed: the demo account's "quieter"
+count dropped from 53 to 19 once the filter started doing real work instead
+of passing everything through.
+
+---
+
 ### Cooldown had a real bug: it only checked the DB, not the batch it was in
 
 Found running the news/silence detectors: on a first-ever backfill, the "same

@@ -7,6 +7,19 @@ import type { DigestEvent } from "./types";
  */
 export function whyLine(e: DigestEvent): string {
   const s = e.payload;
+
+  // A one-factor model can't tell "this company" from "this sector" apart.
+  // When ≥3 watched holdings in the same sector move together, say that
+  // plainly instead of overclaiming company-specific insight (spec §9-style
+  // honesty, applied to the model itself, not just the data).
+  if (e.sectorCluster) {
+    const others = e.sectorCluster.symbols.filter((s2) => s2 !== e.symbol);
+    return (
+      `Moved with ${others.length} other ${e.sectorCluster.sector} holding${others.length === 1 ? "" : "s"} ` +
+      `(${others.join(", ")}) — likely sector-wide, not company-specific.`
+    );
+  }
+
   switch (e.detector) {
     case "idio_z": {
       if (s.totalPct == null || s.marketPct == null || s.companyPct == null) break;

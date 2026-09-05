@@ -7,13 +7,16 @@ since you last looked that actually matters, and why should you care?**
 
 > **Status: Phase 5 submittable, plus most of 6–7.** Scaffold, schema, a live
 > deploy, ~250 real NSE trading sessions, the detector engine — return z,
-> idiosyncratic z, volume z, structural breaks, news density, silence — with
-> 25 unit tests, the full API, the UI, all 13 edge cases from `SPEC.md` §9, a
-> real (degrading) second-source integration + data health panel, and two
-> detector examples staged against real computed data. **Not built, on
-> purpose:** LLM narration — `CLAUDE.md` bans it outright; see `DECISIONS.md`.
-> See [`PITCH.md`](./PITCH.md) for the pitch, [`DECISIONS.md`](./DECISIONS.md)
-> for the "why," including a real cooldown bug found and fixed along the way.
+> idiosyncratic z, volume z, structural breaks, news density, silence, and
+> sector-move clustering — with 30 unit tests, the full API, the UI, all 13
+> edge cases from `SPEC.md` §9, a real (degrading) second-source integration +
+> data health panel, and several detector examples staged against or found in
+> real computed data. **Not built, on purpose:** LLM narration — `CLAUDE.md`
+> bans it outright; see `DECISIONS.md`. See [`PITCH.md`](./PITCH.md) for the
+> pitch, [`DECISIONS.md`](./DECISIONS.md) for the "why," including two real
+> bugs found and fixed along the way (a cooldown gap, and a `detected_at`
+> timestamp bug in the backfill that made "since you last checked" less exact
+> than it looked).
 >
 > **Fastest way to see it populated:** open the app and click **Load the
 > example** (account code `GRW-24X`).
@@ -32,7 +35,7 @@ cd gww
 npm install
 npm run setup     # Postgres + migrations + seed data + detectors + a populated demo account
 npm run dev       # http://localhost:3000
-npm test          # 25 detector / calendar unit tests, no DB needed
+npm test          # 30 detector / calendar / clustering unit tests, no DB needed
 ```
 
 `npm run setup` also works against a remote database — set `DATABASE_URL` (e.g. a
@@ -126,6 +129,18 @@ within 3 sessions unless its peak `|z|` grew by ≥ 1 — walked session-by-sess
 so this holds on a first backfill, not just incrementally (a real bug, found
 and fixed; see `DECISIONS.md`).
 
+**Sector-move clustering** (`src/lib/sector-cluster.ts`, not in the original
+spec — found by pushing on the model's own limits) — `idio_z` is a
+*single-factor* model: it strips out NIFTY, not the sector. If ≥3 watched
+symbols in the same sector fire `idio_z` the same session, that's not 3
+independent company stories, it's a sector factor the model can't separate
+from real company news. A real example is sitting in the seed data, not
+staged: `TCS`, `INFY`, `WIPRO`, `HCLTECH` all fired `idio_z` on **2026-02-12**
+— a genuine same-day IT-sector move in unmodified NSE prices. The digest
+collapses a cluster like that into one card ("moved with 3 other IT holdings —
+likely sector-wide, not company-specific") instead of letting one sector event
+occupy 3 of the 5 headline slots. Pure, unit tested against that exact event.
+
 ---
 
 ## API
@@ -155,7 +170,7 @@ No UI yet — every route below is real and returns JSON.
     "thesis": "High-beta proxy for the group. In only for the volatility…",
     "sinceLastSeen": { "sessions": 25, "totalPct": -4.86, "marketPct": -2.21, "companyPct": -2.70 }
   }],
-  "quieter": { "count": 53, "symbols": [{ "symbol": "COALINDIA", "count": 9 }] }
+  "quieter": { "count": 19, "symbols": [{ "symbol": "COALINDIA", "count": 4 }] }
 }
 ```
 
