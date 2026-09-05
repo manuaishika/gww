@@ -34,15 +34,13 @@ export function TrendingPreview({ onAdded }: { onAdded: () => void }) {
   }
 
   if (items == null) {
-    return <p className="text-[12.5px] text-slate">checking what moved recently…</p>;
+    return <p className="text-[12.5px] text-slate">loading…</p>;
   }
   if (items.length === 0) return null;
 
   return (
     <div className="mb-6">
-      <p className="mb-2 text-[13px] font-medium text-ink">
-        What the detector found this week
-      </p>
+      <p className="mb-2 text-[13px] font-medium text-ink">Notable this week</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {items.map((item) => {
           const headline = signalPct(item.payload);

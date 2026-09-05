@@ -10,13 +10,13 @@ export function Hero({ digest }: { digest: Digest }) {
   const headlineN = digest.headlines.length;
   const sub =
     digest.watching === 0
-      ? "The digest is what moved that matters, since you last looked. Add something to start one."
+      ? "Add a symbol to start a digest."
       : headlineN > 0
-        ? `${headlineN} of ${digest.watching} moved in a way worth a look. The rest stayed inside normal range.`
+        ? `${headlineN} of ${digest.watching} moved enough to surface. The rest stayed inside their normal range.`
         : digest.emptyReason === "not_watching_yet"
-          ? `Watching ${digest.watching}. Nothing has happened since — here's the recent history.`
+          ? `Watching ${digest.watching}. Recent history below.`
           : digest.emptyReason === "all_quiet"
-            ? `Watching ${digest.watching}. Every move stayed inside its own normal range.`
+            ? `Watching ${digest.watching}. Nothing crossed the bar.`
             : `Watching ${digest.watching}.`;
 
   const days = digest.awayDays;

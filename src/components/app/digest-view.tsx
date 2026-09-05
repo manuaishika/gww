@@ -36,8 +36,8 @@ export function DigestView({
       <div className="space-y-3">
         <div className="rounded-md border border-dashed border-ink/15 px-4 py-3">
           <p className="text-[13.5px] text-ink">
-            You just started watching these. Nothing has happened <em>since</em>{" "}
-            &mdash; here is what the engine flagged for them in the last few weeks.
+            Nothing since you started watching. What moved for these in the last
+            few weeks:
           </p>
         </div>
         {digest.lookback.map((e, i) => (

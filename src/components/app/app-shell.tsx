@@ -197,12 +197,7 @@ export function AppShell() {
   );
 }
 
-/**
- * A brand-new visitor has zero watchlist by design (spec §10's empty state
- * says what to do next) — but "what to do next" needs to be one obvious
- * action, not a hunt for the sync-device link. Two real options, not a blank
- * page: load the worked example, or add your own first symbol right here.
- */
+/** The first screen for a visitor with no watchlist yet. */
 function FirstRun({
   loadingDemo,
   onLoadDemo,
@@ -218,11 +213,10 @@ function FirstRun({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-md border border-ink/10 bg-ink/[0.02] p-5">
-          <p className="text-[14px] font-medium text-ink">See it working first</p>
+          <p className="text-[14px] font-medium text-ink">Example watchlist</p>
           <p className="mt-1 text-[13px] text-slate">
-            A populated example — NSE and US stocks side by side, real detector
-            events, charts, theses, one position-sized holding. Account code{" "}
-            <code className="rounded-sm bg-ink/5 px-1 py-0.5">{DEMO_CODE}</code>.
+            12 stocks, NSE and US, with detector events, charts and theses.
+            Account code <code className="rounded-sm bg-ink/5 px-1 py-0.5">{DEMO_CODE}</code>.
           </p>
           <button
             type="button"
@@ -230,15 +224,15 @@ function FirstRun({
             disabled={loadingDemo}
             className="mt-3 rounded-sm bg-signal px-4 py-2 text-[13px] font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
           >
-            {loadingDemo ? "Loading…" : "Load the example"}
+            {loadingDemo ? "Loading…" : "Load it"}
           </button>
         </div>
 
         <div className="rounded-md border border-dashed border-ink/15 p-5">
-          <p className="text-[14px] font-medium text-ink">Or search for anything else</p>
+          <p className="text-[14px] font-medium text-ink">Start your own</p>
           <p className="mt-1 text-[13px] text-slate">
-            NSE or US. The digest fills in from the next session onward — a
-            just-added symbol has no baseline yet.
+            Search NSE or US. A just-added symbol has no baseline — the digest
+            fills in from the next session.
           </p>
           <div className="mt-3">
             <AddSymbol onAdded={onAdded} />

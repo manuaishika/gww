@@ -61,11 +61,11 @@ export function AccountBar({
   return (
     <div className="flex flex-col items-end gap-1.5 text-[12.5px]">
       <div className="flex items-center gap-2 text-slate">
-        <span>your code</span>
+        <span>account</span>
         <button
           type="button"
           onClick={copyCode}
-          title="Click to copy — this is what remembers your watchlist"
+          title="Copy account code"
           className="rounded-sm bg-ink/5 px-1.5 py-0.5 font-medium text-ink hover:bg-ink/10"
         >
           {copied ? "copied ✓" : accountCode}
@@ -75,30 +75,27 @@ export function AccountBar({
           className="text-signal hover:underline"
           onClick={() => setOpen((v) => !v)}
         >
-          open on another device
+          other device
         </button>
       </div>
 
       {open && (
-        <div className="flex w-[240px] flex-col items-end gap-2 rounded-sm border border-ink/10 bg-paper p-3">
-          <p className="text-right text-[12px] text-slate">
-            Scan with your phone camera — it opens this same watchlist there.
-            Nothing to type or remember.
-          </p>
+        <div className="flex w-[220px] flex-col items-end gap-2 rounded-sm border border-ink/10 bg-paper p-3">
+          <p className="text-right text-[12px] text-slate">Scan to open this watchlist on your phone.</p>
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={qr} alt={`QR to sync account ${accountCode}`} width={132} height={132} />
+            <img src={qr} alt={`Sync code ${accountCode}`} width={132} height={132} />
           ) : (
             <div className="h-[132px] w-[132px] animate-pulse rounded-sm bg-ink/5" />
           )}
           <details className="w-full text-[11.5px] text-slate">
-            <summary className="cursor-pointer hover:text-ink">or type the code</summary>
+            <summary className="cursor-pointer hover:text-ink">enter a code instead</summary>
             <div className="mt-1.5 flex items-center gap-2">
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="paste a code"
-                className="w-28 rounded-sm border border-ink/15 bg-paper px-2 py-1 uppercase text-ink outline-none focus:border-signal"
+                placeholder="ABC-123"
+                className="w-24 rounded-sm border border-ink/15 bg-paper px-2 py-1 uppercase text-ink outline-none focus:border-signal"
               />
               <button
                 type="button"
@@ -106,7 +103,7 @@ export function AccountBar({
                 disabled={busy || code.trim().length < 6}
                 className="text-signal hover:underline disabled:opacity-40"
               >
-                {busy ? "…" : "switch"}
+                {busy ? "…" : "go"}
               </button>
             </div>
             {error && <p className="mt-1 text-amber">{error}</p>}
