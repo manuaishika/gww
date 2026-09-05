@@ -140,10 +140,10 @@ export function AppShell() {
     <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <p className="text-[14px] font-semibold tracking-tight text-ink">
+          <p className="text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
             Notice
           </p>
-          <p className="text-[12px] text-slate">
+          <p className="mt-0.5 text-[12.5px] text-slate">
             what moved that matters, since you last looked
           </p>
         </div>
