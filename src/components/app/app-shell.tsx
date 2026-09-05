@@ -144,7 +144,7 @@ export function AppShell() {
             Notice
           </p>
           <p className="mt-0.5 text-[12.5px] text-slate">
-            what moved that matters, since you last looked
+            the moves that matter, since you last looked
           </p>
         </div>
         <AccountBar accountCode={digest.accountCode} onSynced={load} />

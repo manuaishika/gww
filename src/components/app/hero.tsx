@@ -39,11 +39,18 @@ export function Hero({ digest }: { digest: Digest }) {
           </span>
         </div>
       ) : (
-        <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+        <h1 className="text-lg font-semibold tracking-tight text-ink sm:text-xl">
           {awayText(days, digest.watching)}
         </h1>
       )}
-      <p className="mt-3 max-w-lg text-[14.5px] leading-relaxed text-slate">{sub}</p>
+      <p
+        className={
+          "mt-2 max-w-lg leading-relaxed text-slate " +
+          (showBigNumber ? "text-[14.5px]" : "text-[13px]")
+        }
+      >
+        {sub}
+      </p>
     </header>
   );
 }
