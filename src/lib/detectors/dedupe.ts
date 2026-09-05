@@ -1,5 +1,5 @@
 /**
- * Deduplication and cooldown (spec §4.7). Both are pure.
+ * Deduplication and cooldown. Both are pure.
  *
  * One event per (symbol, session). dedupeKey: re-running the detector over the
  * same session produces the same key, so a unique constraint on

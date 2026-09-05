@@ -1,8 +1,10 @@
-# Smart Market Watchlist
+# Notice
+
+A smart market watchlist that surfaces what you'd want to be *notified* about.
 
 **Live:** https://gww-ten.vercel.app — open the app, pick **Example watchlist → Load it** (account code `GRW-24X`) to see it populated with NSE and US holdings.
 
-A watchlist that answers one question: **what changed since you last looked that
+Notice answers one question: **what changed since you last looked that
 actually matters, and why should you care?** Every stock is measured against its
 own recent volatility and its own market's benchmark — NIFTY for NSE, the S&P 500
 for US names — because a 3% day means something different for every name. No
@@ -166,8 +168,3 @@ provider. The only broker-adjacent input is an optional typed position size
 **No LLM narration.** Every number on a card traces back to the detector engine
 with nothing in between that could hallucinate a percentage; template-composed
 copy (`card-copy.ts`) is the whole narration layer.
-
----
-
-Full detector maths and the `spec §N` section numbers referenced throughout the
-code comments: [`SPEC.md`](./SPEC.md).

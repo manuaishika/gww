@@ -1,5 +1,5 @@
 /**
- * Account codes (spec §6). Six characters, shown as `K7M-2QX`. The alphabet
+ * Account codes. Six characters, shown as `K7M-2QX`. The alphabet
  * drops the ambiguous glyphs (0/O, 1/I/L, etc.) so a code read off one screen
  * types cleanly into another. 6 chars over a 28-symbol alphabet ≈ 480M codes.
  */

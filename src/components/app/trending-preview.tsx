@@ -10,9 +10,7 @@ import type { TrendingItem } from "./types";
 /**
  * A global preview of the detector engine's own real output, for a visitor
  * with no watchlist yet — the first screen should show what the product
- * actually finds, not just tell you to go add something (spec §10's "an
- * empty watchlist says what to do next" extended one step further: it should
- * also show proof the thing works before you commit to anything).
+ * actually finds, not just tell you to go add something.
  */
 export function TrendingPreview({ onAdded }: { onAdded: () => void }) {
   const [items, setItems] = useState<TrendingItem[] | null>(null);

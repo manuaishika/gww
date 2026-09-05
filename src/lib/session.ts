@@ -1,5 +1,5 @@
 /**
- * Identity (spec §6). No OAuth. A first visit mints a `user_id` + account code,
+ * Identity. No OAuth. A first visit mints a `user_id` + account code,
  * stored in an httpOnly cookie. Because every watermark lives in Postgres, not
  * localStorage, entering the code on another device gives you the same diff
  * state — that's the whole cross-device story, and it costs one table.

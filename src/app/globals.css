@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* spec §10 palette + amber for stale/disputed only */
+  /* palette + amber for stale/disputed only */
   --paper: #fbfbf9;
   --ink: #141619;
   --slate: #6b7280;
@@ -21,7 +21,7 @@ html {
 body {
   background: var(--paper);
   color: var(--ink);
-  /* every figure aligns — spec §10 */
+  /* every figure aligns */
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }

@@ -7,7 +7,7 @@ import { StalenessPill } from "./staleness-pill";
 import { useSymbolDetail } from "./symbol-detail";
 import type { WatchlistItem } from "./types";
 
-// No baseline yet — watermark = added_at (spec §9's "just-added symbol").
+// No baseline yet — watermark = added_at ("just-added symbol").
 // The digest is honestly empty for it until the next session; the table says why.
 function isFreshlyAdded(item: WatchlistItem): boolean {
   return item.lastSeenAt === item.addedAt;

@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import { api } from "./api-client";
 
 /**
- * Cross-device sync without an account system (spec §6: no OAuth). Your code
+ * Cross-device sync without an account system (no OAuth). Your code
  * is assigned on first visit and remembers THIS watchlist. To get it onto
  * another device you don't have to type or remember anything — scan the QR
  * with your phone camera and it opens the app already synced (the QR is a URL

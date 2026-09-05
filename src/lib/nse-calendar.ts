@@ -1,5 +1,5 @@
 /**
- * The NSE trading calendar (spec §9).
+ * The NSE trading calendar.
  *
  * We never compute a change "across a session boundary that doesn't exist" by
  * assuming `weekday != Sunday`. NSE has ~14 trading holidays a year, plus the

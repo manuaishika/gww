@@ -8,7 +8,7 @@ import {
   sessionsBetween,
 } from "./nse-calendar";
 
-describe("nse-calendar (spec §9)", () => {
+describe("nse-calendar", () => {
   it("loads the committed session list", () => {
     expect(allSessions().length).toBeGreaterThan(200);
     expect(firstSession < lastSession).toBe(true);

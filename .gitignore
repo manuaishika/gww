@@ -32,3 +32,6 @@ yarn-error.log*
 
 # drizzle studio
 .drizzle
+
+# design spec — kept locally as the working reference, not shipped
+SPEC.md

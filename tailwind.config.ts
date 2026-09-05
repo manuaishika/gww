@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 
-// Palette is spec §10 (paper/ink/slate/signal), amber for stale/disputed only.
+// Palette: paper/ink/slate/signal, amber for stale/disputed only.
 // gain/loss encode DIRECTION ONLY — never scaled by how big a move is; that's
 // the materiality bar and the card size's job. Muted enough for the paper
 // ground, not neon.

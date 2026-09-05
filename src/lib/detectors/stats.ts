@@ -1,6 +1,6 @@
 /**
  * computeStats — turns a symbol's bar history (+ the index) into the row that
- * goes in `stats_daily`. Pure. Run once per session per symbol (spec §4).
+ * goes in `stats_daily`. Pure. Run once per session per symbol.
  *
  * Everything is on adjusted close so a split doesn't read as a 90% crash.
  */

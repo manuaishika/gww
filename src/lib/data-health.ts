@@ -1,5 +1,5 @@
 /**
- * "Makes the system look operated rather than assembled" (spec §7, optional).
+ * "Makes the system look operated rather than assembled" (optional).
  * Global, not per-user — this describes the shared quote data, same for
  * everyone.
  */

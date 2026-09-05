@@ -1,5 +1,5 @@
 /**
- * Watchlist operations (spec §5, §6, §8). All take a userId; none mint sessions.
+ * Watchlist operations. All take a userId; none mint sessions.
  */
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -211,9 +211,9 @@ export async function updateWatchlistItem(
 }
 
 /**
- * Advance watermarks (spec §5) — on dismiss or explicit mark-as-read, never on
+ * Advance watermarks — on dismiss or explicit mark-as-read, never on
  * page load. The update is GREATEST(existing, incoming), so two devices can't
- * rewind each other (spec §9).
+ * rewind each other.
  */
 export async function markSeen(
   userId: string,

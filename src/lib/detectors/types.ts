@@ -10,7 +10,7 @@ export type Bar = {
 
 export type CircuitState = "none" | "upper" | "lower";
 
-/** Precomputed once per session per symbol (spec §4, stored in stats_daily). */
+/** Precomputed once per session per symbol (stored in stats_daily). */
 export type SymbolStats = {
   sigma60: number | null;
   beta60: number | null;
@@ -42,7 +42,7 @@ export type DetectorHit = {
 /**
  * What the engine actually persists: ONE row per (symbol, session). `detector`
  * is the dominant signal; `signals` carries every computed fact so the card can
- * compose from it without another query (spec §8).
+ * compose from it without another query.
  */
 export type SessionEvent = {
   symbol: string;
@@ -68,7 +68,7 @@ export type EventSignals = {
   horizonSessions: number;
   baselineDate: string;
   newsCount: number | null; // headlines/results in the detection window
-  isSilence: boolean; // a news/results event with no repricing (spec §4.6)
+  isSilence: boolean; // a news/results event with no repricing
 };
 
 /**
@@ -88,6 +88,6 @@ export type DetectContext = {
   horizonSessions: number;
   circuitState: CircuitState;
   /** News/results dates up to and including `sessionDate`, ascending. Optional
-   *  detectors (§4.5, §4.6) — an empty array just means neither can fire. */
+   *  detectors — an empty array just means neither can fire. */
   newsEvents: NewsItem[];
 };

@@ -2,7 +2,7 @@ import { flagLabel, signed } from "./format";
 import type { DigestEvent, EventSignals } from "./types";
 
 /**
- * Template-composed card copy (spec §8) — no LLM. Every number comes from the
+ * Template-composed card copy — no LLM. Every number comes from the
  * detector engine; this just turns the payload into one readable sentence.
  *
  * `describeSignal` is the reusable base (detector + z + payload only) — the
@@ -46,8 +46,7 @@ export function describeSignal(
 export function whyLine(e: DigestEvent): string {
   // A one-factor model can't tell "this company" from "this sector" apart.
   // When ≥3 watched holdings in the same sector move together, say that
-  // plainly instead of overclaiming company-specific insight (spec §9-style
-  // honesty, applied to the model itself, not just the data).
+  // plainly instead of overclaiming company-specific insight.
   if (e.sectorCluster) {
     const others = e.sectorCluster.symbols.filter((s2) => s2 !== e.symbol);
     return (

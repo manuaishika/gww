@@ -7,7 +7,7 @@ const q = (price: number, source: string, tsMs: number): SourceQuote => ({
   exchangeTs: new Date(tsMs),
 });
 
-describe("reconcileQuotes (spec §7)", () => {
+describe("reconcileQuotes", () => {
   it("passes a single source straight through, undisputed", () => {
     const r = reconcileQuotes(q(100, "yahoo", 1000), null);
     expect(r.price).toBe(100);

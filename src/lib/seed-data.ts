@@ -1,6 +1,6 @@
 /**
  * The universe. ~30 NSE symbols across sectors + the index.
- * Bars for these are backfilled and committed in Phase 1 (spec §12).
+ * Bars for these are backfilled and committed in Phase 1.
  * NSE tickers here carry no suffix; the `.NS` suffix is added only in the
  * yahoo-finance2 ingest path.
  */
@@ -9,7 +9,7 @@ export type SeedSymbol = {
   name: string;
   sector: string;
   listedOn: string; // ISO date
-  isActive?: boolean; // default true; false = delisted/renamed (spec §9)
+  isActive?: boolean; // default true; false = delisted/renamed
   note?: string;
   // Multi-market: default to NSE/INR/IST/NIFTY when omitted.
   exchange?: string;
@@ -48,7 +48,7 @@ export const SEED_SYMBOLS: SeedSymbol[] = [
     sector: "Auto",
     listedOn: "1998-07-22",
     isActive: false,
-    note: "Demerged into TMPV / TMCV in 2025; the TATAMOTORS line no longer trades. Kept as a live example of the delisted/renamed edge case (spec §9) — it stays in a watchlist, renders dimmed, and fires no detectors.",
+    note: "Demerged into TMPV / TMCV in 2025; the TATAMOTORS line no longer trades. Kept as a live example of the delisted/renamed edge case — it stays in a watchlist, renders dimmed, and fires no detectors.",
   },
   { symbol: "M&M", name: "Mahindra & Mahindra", sector: "Auto", listedOn: "1995-07-03" },
   { symbol: "TATASTEEL", name: "Tata Steel", sector: "Materials", listedOn: "1995-11-22" },

@@ -10,7 +10,7 @@ const plex = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Smart Market Watchlist",
+  title: "Notice",
   description:
     "A diff engine for your NSE watchlist. What changed that actually matters, and why should you care?",
 };

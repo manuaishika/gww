@@ -1,5 +1,5 @@
 /**
- * The digest (spec §5). Read path:
+ * The digest. Read path:
  *   1. watchlist + per-symbol watermarks
  *   2. events since each watermark, not dismissed
  *   3. rank by score, cap at 5; the rest collapse into a count
@@ -62,7 +62,7 @@ type Decomposition = {
 
 /**
  * "checked" — since your own watermark, the default and the product's actual
- * baseline (spec §1). The numbers are fixed session windows for a deliberate
+ * baseline. The numbers are fixed session windows for a deliberate
  * daily / weekly / monthly review, where "regardless of when I opened the app"
  * is the right question. The default is never a fixed window.
  */
@@ -282,7 +282,7 @@ export async function buildDigest(
   }
 
   // Nothing since the watermark? If it's because everything was just added
-  // (spec §9's "just-added symbol"), don't show a bare "all quiet" — show
+  // ("just-added symbol"), don't show a bare "all quiet" — show
   // what the engine already flagged for these names in the recent window, so
   // the digest is never empty of substance the moment you start watching.
   // Only in "checked" mode — a fixed window that's empty is just empty.

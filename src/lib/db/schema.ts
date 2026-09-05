@@ -1,5 +1,5 @@
 /**
- * Data model — spec §3.
+ * Data model.
  *
  * The split that matters: market data (`bars_daily`, `quotes_latest`,
  * `stats_daily`, `events`) is shared across all users. Per-user state is tiny
@@ -57,7 +57,7 @@ export const watchlistItems = pgTable(
       .notNull()
       .references(() => symbols.symbol),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
-    thesis: text("thesis"), // "why am I watching this" — spec §8
+    thesis: text("thesis"), // "why am I watching this"
     mutedUntil: timestamp("muted_until", { withTimezone: true }),
     // Optional, per-item, per-user (never touches the shared `events.score`).
     // Units are the symbol's own shares/units — no valuation, no broker link.
@@ -101,7 +101,7 @@ export const quotesLatest = pgTable("quotes_latest", {
   circuitState: text("circuit_state").notNull().default("none"), // 'none' | 'upper' | 'lower'
 });
 
-/** Precomputed once per session (spec §4). */
+/** Precomputed once per session. */
 export const statsDaily = pgTable("stats_daily", {
   symbol: text("symbol").primaryKey(),
   sigma60: numeric("sigma_60"), // stdev of daily log returns, 60 sessions
@@ -115,7 +115,7 @@ export const statsDaily = pgTable("stats_daily", {
   computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Per-symbol, shared. Deduped by `dedupeKey` (spec §4.7). */
+/** Per-symbol, shared. Deduped by `dedupeKey`. */
 export const events = pgTable(
   "events",
   {
@@ -162,7 +162,7 @@ export const userEventState = pgTable(
 );
 
 /**
- * Phase 7 (spec §4.5, §4.6) — news density + silence detectors.
+ * Phase 7 — news density + silence detectors.
  * Structured event dates, not scraped headline text: no news API is wired up
  * (would need a key, breaking the no-keys guarantee), so this is seeded from
  * a small, clearly-illustrative results calendar.

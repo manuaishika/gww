@@ -1,5 +1,5 @@
 /**
- * Reconciling two price sources (spec §7). Pure — no I/O, no clock other than
+ * Reconciling two price sources. Pure — no I/O, no clock other than
  * what's passed in. If the sources differ by more than the threshold, don't
  * silently pick one: flag it, show both, prefer the fresher exchange_ts, log
  * why.

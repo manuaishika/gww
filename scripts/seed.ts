@@ -6,7 +6,7 @@
  *   - bars_daily : ~250 real trading sessions per market, each aligned to
  *     ITS OWN exchange's calendar (src/lib/seed/bars.json)
  *   - quotes_latest : derived from each symbol's last two bars, with the
- *     staleness metadata the client contract requires (spec §7)
+ *     staleness metadata the client contract requires
  *
  * Idempotent — safe to re-run. Regenerate bars.json with:
  *   node scripts/fetch-bars.mjs
@@ -162,18 +162,18 @@ async function main() {
     });
   console.log(`✓ ${quoteRows.length} quotes (source=seed, as of ${barsFile.sessions.at(-1)})`);
 
-  // Staged example: circuit limits are real and unhandled by most submissions
-  // (spec §9). We have no live feed to hit an actual circuit with, so one
+  // Staged example: circuit limits are real and unhandled by most submissions.
+  // We have no live feed to hit an actual circuit with, so one
   // symbol is flagged explicitly — SUNPHARMA is otherwise an ordinary quiet
   // day in the seed data, chosen so this doesn't collide with a real headline.
-  // The volume detector checks this and suppresses itself (spec §4.3).
+  // The volume detector checks this and suppresses itself.
   await db
     .update(quotesLatest)
     .set({ circuitState: "upper" })
     .where(sql`${quotesLatest.symbol} = 'SUNPHARMA'`);
   console.log("✓ staged circuit-limit example: SUNPHARMA at upper circuit");
 
-  // Staged example: a disputed quote (spec §7). No FINNHUB_API_KEY is
+  // Staged example: a disputed quote. No FINNHUB_API_KEY is
   // configured (see .env.example), so there's no live second source to
   // actually disagree with the first — the mechanism (is_disputed,
   // dispute_note, prefer-newer-exchange_ts) is real, but this one flag is
@@ -183,7 +183,7 @@ async function main() {
     .set({
       isDisputed: true,
       disputeNote:
-        "Staged (spec §7) — no second source configured (FINNHUB_API_KEY unset). " +
+        "Staged — no second source configured (FINNHUB_API_KEY unset). " +
         "This is what renders when two sources disagree by >0.5%: both shown, " +
         "the newer exchange_ts wins, and the disagreement is logged rather than hidden.",
     })

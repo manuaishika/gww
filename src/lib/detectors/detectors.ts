@@ -1,5 +1,5 @@
 /**
- * The detectors (spec §4.1–§4.6) and the engine that runs them.
+ * The detectors and the engine that runs them.
  *
  * Each detector is pure: (ctx, signals) => DetectorHit | null. `signals` is
  * derived purely from `ctx` (one pass, see signals.ts) and passed in so the
@@ -7,7 +7,7 @@
  *
  * `detectSymbol` composes their output into ONE event per (symbol, session) —
  * the dominant signal plus every computed fact, so a digest card never needs a
- * second query to explain itself (spec §8).
+ * second query to explain itself.
  */
 import { CONFIG } from "./config";
 import { dedupeKey } from "./dedupe";
@@ -68,7 +68,7 @@ export function detectIdiosyncratic(
 
 // ─── 4.3 volume anomaly ─────────────────────────────────────────────────────
 export function detectVolume(ctx: DetectContext, s: Signals): DetectorHit | null {
-  // a circuit-locked stock has no two-way market — volume is meaningless (spec §9)
+  // a circuit-locked stock has no two-way market — volume is meaningless
   if (ctx.circuitState !== "none") return null;
   if (!hasHistory(ctx) || s.zVol == null || s.volToday == null) return null;
   if (s.zVol < CONFIG.volume.emitZ) return null;
@@ -151,9 +151,9 @@ export const DETECTORS = [
   detectSilence,
 ] as const;
 
-// ─── scoring (spec §4.7): score = 100 · sigmoid(Σ wᵢ · featureᵢ) ────────────
+// ─── scoring: score = 100 · sigmoid(Σ wᵢ · featureᵢ) ────────────
 // News/silence are binary flags with a fixed contribution, like structural
-// breaks (spec §4.4's pattern) — there's no natural z-score for "a headline
+// breaks — there's no natural z-score for "a headline
 // count" or "the absence of a move."
 function sessionScore(s: Signals): number {
   const w = CONFIG.score.weights;
@@ -173,11 +173,11 @@ function sessionScore(s: Signals): number {
 
 /** Which fired signal should headline the card. */
 function dominantDetector(hits: DetectorHit[]): DetectorHit {
-  // idiosyncratic is "the one that matters" (spec §4.2) whenever it fired
+  // idiosyncratic is "the one that matters" whenever it fired
   const idio = hits.find((h) => h.detector === "idio_z");
   if (idio) return idio;
   // silence can only fire alongside idio when idio didn't cross its own
-  // threshold (§4.6 requires |z_idio| < 0.5), so it never has to compete with
+  // threshold (silence requires |z_idio| < 0.5), so it never has to compete with
   // idio for the headline — but it's the most narratively distinctive signal
   // when present, so it outranks volume/structural/news.
   const silence = hits.find((h) => h.detector === "silence");
@@ -187,8 +187,7 @@ function dominantDetector(hits: DetectorHit[]): DetectorHit {
 
 /**
  * Run every detector for one session of one symbol and compose ONE event —
- * the dominant signal plus every computed fact (spec §8's card needs all of
- * them, not just the one that happened to cross its threshold).
+ * the dominant signal plus every computed fact.
  */
 export function detectSymbol(ctx: DetectContext): SessionEvent | null {
   const signals = computeSignals(ctx);

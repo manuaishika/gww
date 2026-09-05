@@ -2,7 +2,7 @@
 
 import { classifyQuote, stalenessLabel, type QuoteLike } from "@/lib/staleness";
 
-/** amber is reserved ONLY for stale/disputed data (spec §10). */
+/** amber is reserved ONLY for stale/disputed data. */
 export function StalenessPill({ quote }: { quote: QuoteLike | null }) {
   const s = classifyQuote(quote);
   const dimmed = s.kind === "stale" || s.kind === "no_data";
@@ -23,6 +23,7 @@ export function StalenessPill({ quote }: { quote: QuoteLike | null }) {
         aria-hidden
       />
       {stalenessLabel(s)}
+      {quote?.source && s.kind !== "no_data" ? ` · ${quote.source}` : ""}
       {quote?.isDisputed ? " · disputed" : ""}
     </span>
   );

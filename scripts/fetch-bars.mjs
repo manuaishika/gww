@@ -1,7 +1,7 @@
 /**
  * Dev-only. Regenerates the committed seed dataset:
  *   src/lib/seed/bars.json          — ~250 trading sessions of daily bars
- *   src/lib/seed/nse-calendar.json  — the NSE session calendar (spec §9)
+ *   src/lib/seed/nse-calendar.json  — the NSE session calendar
  *
  * yahoo-finance2 needs no API key, so this is re-runnable by anyone. The output
  * is committed so a clean clone has real NSE data with zero configuration.
@@ -139,7 +139,7 @@ async function main() {
     join(SEED_DIR, "nse-calendar.json"),
     JSON.stringify(
       {
-        note: "NSE trading sessions, derived from ^NSEI. Used to count sessions between two dates without assuming weekday != Sunday (spec §9).",
+        note: "NSE trading sessions, derived from ^NSEI. Used to count sessions between two dates without assuming weekday != Sunday.",
         generatedAt: new Date().toISOString(),
         sessions,
       },

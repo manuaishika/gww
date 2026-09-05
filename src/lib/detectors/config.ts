@@ -1,6 +1,6 @@
 /**
  * Every number the detector engine uses. Nothing numeric is hardcoded inside a
- * detector function — if you're tuning behaviour, it's in here. (spec §4)
+ * detector function — if you're tuning behaviour, it's in here.
  *
  * The "sensitivity dial" (Phase 8) is a multiplier over `score.weights`.
  */
@@ -13,13 +13,13 @@ export const CONFIG = {
     highLowWindow: 252, // ~one trading year
     maWindow: 50, // moving average for the cross detector
     maCrossLookback: 20, // "first cross in ≥ N sessions"
-    minSessionsForStats: 60, // insufficient-history guard (spec §9)
+    minSessionsForStats: 60, // insufficient-history guard
   },
 
   /** Horizon = trading sessions between the baseline and the session evaluated. */
   horizon: {
-    minSessions: 0.25, // intraday floor so √h doesn't explode (spec §4.1)
-    maxSessions: 20, // very-long-absence cap: √h saturates otherwise (spec §9)
+    minSessions: 0.25, // intraday floor so √h doesn't explode
+    maxSessions: 20, // very-long-absence cap: √h saturates otherwise
   },
 
   /** |z| thresholds. `notable` fires an event; `strong` labels it. */
@@ -29,7 +29,7 @@ export const CONFIG = {
   volume: {
     madScale: 1.4826, // MAD → σ-equivalent for a normal distribution
     emitZ: 3, // a volume event needs a real spike, not z > 1
-    minMad: 1e-6, // guard: zero-volume / constant-volume history (spec §9)
+    minMad: 1e-6, // guard: zero-volume / constant-volume history
   },
 
   structural: {
@@ -38,7 +38,7 @@ export const CONFIG = {
   },
 
   /**
-   * News density (§4.5) and silence (§4.6) — optional, Phase 7. There's no
+   * News density and silence — optional, Phase 7. There's no
    * live news feed wired up (would need a key); these read from a small
    * committed, clearly-illustrative results calendar.
    */
@@ -50,7 +50,7 @@ export const CONFIG = {
   },
 
   /**
-   * score = 100 · sigmoid(Σ wᵢ · featureᵢ)  — spec §4.7
+   * score = 100 · sigmoid(Σ wᵢ · featureᵢ)
    * Weights are calibrated so the sigmoid works in its responsive range: a
    * lone 2σ idio move ≈ 73, 3σ ≈ 82, 5σ ≈ 92, and co-occurring volume /
    * structural signals push toward 100. The volume term is capped so one

@@ -8,7 +8,7 @@
  * DATES only (no scraped headline text), deterministic from the symbol name
  * so it's reproducible, plus two examples engineered against the REAL price
  * series (src/lib/seed/bars.json) to demonstrate the news-density and
- * silence detectors (spec §4.5, §4.6) actually firing, not just described.
+ * silence detectors actually firing, not just described.
  *
  *   npx tsx scripts/generate-news.ts
  */

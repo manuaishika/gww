@@ -5,7 +5,7 @@ import { api } from "./api-client";
 import type { DataHealth } from "./types";
 
 /**
- * "Makes the system look operated rather than assembled" (spec §7). Global,
+ * "Makes the system look operated rather than assembled". Global,
  * not per-user. Collapsed by default — this is for someone who goes looking,
  * not a thing to compete with the digest for attention.
  */
@@ -35,7 +35,7 @@ export function DataHealthPanel() {
           <p>
             Primary: <span className="text-ink">{health.sources.primary}</span>. Secondary:{" "}
             <span className="text-ink">{health.sources.secondary ?? "not configured"}</span>
-            {!health.sources.secondary && " — set FINNHUB_API_KEY to enable (optional, spec §7)"}.
+            {!health.sources.secondary && " — set FINNHUB_API_KEY to enable (optional)"}.
           </p>
           <p>
             {health.totalQuotes} quotes tracked

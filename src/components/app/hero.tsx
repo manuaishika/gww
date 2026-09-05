@@ -2,7 +2,7 @@ import { awayText } from "./format";
 import type { Digest } from "./types";
 
 /**
- * The hero is the time gap (spec §10). Default: "3 days away" as a large
+ * The hero is the time gap. Default: "3 days away" as a large
  * numeral. In a fixed-window review (Today / 7d / 30d) it names the window
  * instead — the default is never a fixed window, but the window views are a
  * real workflow and should say what they are.

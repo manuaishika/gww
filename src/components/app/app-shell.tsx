@@ -141,7 +141,7 @@ export function AppShell() {
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
           <p className="text-[14px] font-semibold tracking-tight text-ink">
-            Smart Market Watchlist
+            Notice
           </p>
           <p className="text-[12px] text-slate">
             what moved that matters, since you last looked

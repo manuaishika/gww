@@ -6,7 +6,7 @@ import { markSeen } from "@/lib/watchlist";
 export const dynamic = "force-dynamic";
 
 /**
- * Advance the watermark — spec §5. Call on dismiss or an explicit "mark as
+ * Advance the watermark. Call on dismiss or an explicit "mark as
  * read", NEVER on page load.
  *
  *   { eventIds: [...] }  dismiss those events + advance their symbols

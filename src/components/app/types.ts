@@ -1,4 +1,4 @@
-// Client-side mirrors of the API JSON shapes (spec §5, §6, §7). Kept separate
+// Client-side mirrors of the API JSON shapes. Kept separate
 // from the server types so nothing server-only leaks into the client bundle.
 
 export type Quote = {

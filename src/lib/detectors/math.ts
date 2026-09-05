@@ -1,6 +1,6 @@
 /**
  * Pure statistics primitives. No domain knowledge, no config, no I/O.
- * Every function here is on a whiteboard in one line (spec §0).
+ * Every function here is on a whiteboard in one line.
  */
 
 export function mean(xs: readonly number[]): number {

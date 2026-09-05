@@ -31,9 +31,9 @@ export type Signals = {
   structFlags: number;
 
   newsCountWindow: number; // dated events in the trailing news window
-  newsDensityFlag: boolean; // §4.5
+  newsDensityFlag: boolean;
   daysSinceNews: number | null;
-  silenceFlag: boolean; // §4.6
+  silenceFlag: boolean;
 };
 
 const indexCloseOn = (
@@ -152,7 +152,7 @@ export function computeSignals(ctx: DetectContext): Signals {
     Number(out.gap) +
     Number(out.maCrossUp || out.maCrossDown);
 
-  // --- news density (§4.5) & silence (§4.6) ---
+  // --- news density & silence ---
   const sessionMs = Date.parse(ctx.sessionDate);
   const daysAgo = (d: string) => (sessionMs - Date.parse(d)) / 86_400_000;
 

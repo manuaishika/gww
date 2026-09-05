@@ -9,7 +9,7 @@ import { useSymbolDetail } from "./symbol-detail";
 import { ZContextStrip } from "./z-context-strip";
 import type { Digest, DigestEvent } from "./types";
 
-// Weight and position encode materiality (spec §10) — the top card is larger
+// Weight and position encode materiality — the top card is larger
 // and heavier; by rank 3-4 it's reading like a footnote, not a duplicate card.
 const SCALE = [
   { title: "text-2xl sm:text-[26px]", pad: "p-6", accent: "border-l-[3px] border-signal", figure: "text-2xl", bg: "bg-signal/[0.035]" },
@@ -105,7 +105,7 @@ function Card({
     <article
       className={`overflow-hidden rounded-sm ${scale.bg} ${scale.accent} ${scale.pad} shadow-[0_1px_0_rgba(20,22,25,0.06)]`}
     >
-      {/* materiality, as a thin bar — spec §10: weight encodes how much it matters */}
+      {/* materiality, as a thin bar — weight encodes how much it matters */}
       <div className="mb-2.5 h-[3px] w-full rounded-full bg-ink/[0.06]">
         <div
           className="h-full rounded-full bg-signal/70"
@@ -206,7 +206,7 @@ function Card({
 }
 
 // Horizon is capped at 20 sessions (src/lib/detectors/config.ts) so a very
-// long absence doesn't read as one enormous, meaningless move (spec §9).
+// long absence doesn't read as one enormous, meaningless move.
 const HORIZON_CAP_SESSIONS = 20;
 
 function sinceLabel(sessions: number): string {

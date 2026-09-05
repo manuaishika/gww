@@ -1,5 +1,5 @@
 /**
- * Primary market-data source (spec §2). yahoo-finance2 needs no API key.
+ * Primary market-data source. yahoo-finance2 needs no API key.
  * NSE symbols take a `.NS` suffix; US symbols are bare; the two index
  * benchmarks map to `^NSEI` / `^GSPC`.
  *

@@ -151,7 +151,7 @@ describe("computeStats", () => {
   });
 });
 
-describe("idiosyncratic detector (spec §4.2)", () => {
+describe("idiosyncratic detector", () => {
   it("a stock that moved exactly with the index has z_idio ≈ 0 and no event", () => {
     const { bars, indexBars } = world({
       beta: 1.2,
@@ -197,7 +197,7 @@ describe("idiosyncratic detector (spec §4.2)", () => {
   });
 });
 
-describe("return-z detector (spec §4.1)", () => {
+describe("return-z detector", () => {
   it("fires on a > 2σ move and labels ≥ 3σ as strong", () => {
     const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.07, finalIndexRet: 0 });
     const ctx = buildContext(bars, indexBars);
@@ -216,7 +216,7 @@ describe("return-z detector (spec §4.1)", () => {
   });
 });
 
-describe("splits and bonus issues (spec §9)", () => {
+describe("splits and bonus issues", () => {
   it("a 1:2 split does not fire the return detector (adjClose is smooth)", () => {
     const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
     // simulate an unadjusted split on the last day: raw close halves,
@@ -236,7 +236,7 @@ describe("splits and bonus issues (spec §9)", () => {
   });
 });
 
-describe("volume detector (spec §4.3, §9)", () => {
+describe("volume detector", () => {
   it("fires on a genuine volume spike", () => {
     const { bars, indexBars } = world({
       beta: 1,
@@ -280,7 +280,7 @@ describe("volume detector (spec §4.3, §9)", () => {
   });
 });
 
-describe("market holidays (spec §9)", () => {
+describe("market holidays", () => {
   it("a normal move across a 4-calendar-day gap is not inflated (horizon is sessions, not days)", () => {
     const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.02, finalIndexRet: 0 });
     // rewrite the last date so there is a Thu→Wed gap (holiday + weekend)
@@ -300,7 +300,7 @@ describe("market holidays (spec §9)", () => {
   });
 });
 
-describe("structural detector (spec §4.4)", () => {
+describe("structural detector", () => {
   it("flags a new 252-session high", () => {
     // strictly increasing series → the last close is an all-time high
     const rising = Array.from({ length: 120 }, (_, i) => 1000 * Math.exp(0.002 * i));
@@ -360,7 +360,7 @@ describe("detectSymbol: one event per (symbol, session)", () => {
   });
 });
 
-describe("news density detector (spec §4.5)", () => {
+describe("news density detector", () => {
   it("fires on a headline cluster even with no price move", () => {
     const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
     const sessionDate = bars.at(-1)!.sessionDate;
@@ -386,7 +386,7 @@ describe("news density detector (spec §4.5)", () => {
   });
 });
 
-describe("silence detector (spec §4.6)", () => {
+describe("silence detector", () => {
   it("fires when a results date passed with no repricing", () => {
     const { bars, indexBars } = world({ beta: 1, finalStockRet: 0.001, finalIndexRet: 0.001 });
     const sessionDate = bars.at(-1)!.sessionDate;

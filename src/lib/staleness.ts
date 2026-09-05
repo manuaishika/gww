@@ -1,5 +1,5 @@
 /**
- * Staleness classification (spec §7). Never render a bare number — every
+ * Staleness classification. Never render a bare number — every
  * quote carries `source`, `exchange_ts`, `fetched_at`; this turns those three
  * fields into one of four honest states. Pure, runs client-side so the badge
  * stays accurate as time passes without a refetch.
@@ -68,7 +68,7 @@ export function classifyQuote(
   let exchangeTs = quote.exchangeTs ? Date.parse(quote.exchangeTs) : null;
   const fetchedAt = quote.fetchedAt ? Date.parse(quote.fetchedAt) : null;
 
-  // clock skew guard (spec §9): never trust an exchange_ts in the future
+  // clock skew guard: never trust an exchange_ts in the future
   if (exchangeTs != null && exchangeTs > nowMs) exchangeTs = null;
 
   const open = isMarketOpen(now);

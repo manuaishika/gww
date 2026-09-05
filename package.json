@@ -1,8 +1,8 @@
 {
-  "name": "smart-watchlist",
+  "name": "notice",
   "version": "0.0.0",
   "private": true,
-  "description": "Smart Market Watchlist — a diff engine for NSE watchlists. Answers 'what changed that actually matters?'",
+  "description": "Notice — a diff engine for NSE watchlists. Answers 'what changed that actually matters?'",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
