@@ -26,8 +26,9 @@ Every headline card carries a chart, not just a number.
 > bug that made "since you last checked" less exact than it looked, and a
 > sector-clustering ordering bug).
 >
-> **Fastest way to see it populated:** open the app and click **Load the
-> example** (account code `GRW-24X`) — NSE and US holdings side by side.
+> **Fastest way to see it populated:** open the app and, under **Example
+> watchlist**, click **Load it** (account code `GRW-24X`) — NSE and US holdings
+> side by side.
 
 **Live:** https://gww-ten.vercel.app
 
@@ -176,7 +177,7 @@ per-symbol and shared; only this user's ranking preference is personal.
 
 ## API
 
-No UI yet — every route below is real and returns JSON.
+Every route is real and returns JSON; the UI is a thin client over these.
 
 | Route | What |
 |---|---|
@@ -195,10 +196,12 @@ No UI yet — every route below is real and returns JSON.
 | `GET /api/cron/tick` | The ingest tick — polls the union of watched symbols. Guarded by `CRON_SECRET` + `ENABLE_INGEST`; off on the demo, real code (`src/lib/ingest/tick.ts`). |
 | `GET /api/symbols/:symbol` | The bigger picture for one name: quote + provenance, stats, recent events, 90-day chart, your watchlist state. |
 
-`GET /api/digest` after adopting `GRW-24X`:
+`GET /api/digest` after adopting `GRW-24X` (numbers illustrative — `awayDays`
+tracks real elapsed time):
 
 ```json
 {
+  "window": "checked", "windowLabel": "since you last checked",
   "awayDays": 35, "awaySessions": 25, "watching": 12,
   "headlines": [{
     "symbol": "TITAN", "detector": "idio_z", "z": 2.84, "score": 95, "currency": "INR",
@@ -207,9 +210,13 @@ No UI yet — every route below is real and returns JSON.
     "sinceLastSeen": { "sessions": 25, "totalPct": 3.11, "marketPct": -1.67, "companyPct": 4.87 },
     "chart": { "closes": [ /* 60 sessions */ ], "zHistory": [ /* 59 daily z's */ ], "watermarkDate": "2026-08-03" }
   }],
+  "lookback": [ /* recent events, only when you just started watching and nothing has happened since */ ],
   "quieter": { "count": 22, "symbols": [{ "symbol": "COALINDIA", "count": 4 }] }
 }
 ```
+
+`window` is `1` / `7` / `30` for a daily / weekly / monthly review — the filter
+switches from your watermark to a fixed session count and `windowLabel` names it.
 
 Note `AAPL`/`MSFT` also sit in this watchlist with `currency: "USD"` — same
 shape, same digest, different market, no conversion anywhere.
@@ -218,8 +225,10 @@ shape, same digest, different market, no conversion anywhere.
 
 ## The UI
 
-One page, two views. Design follows spec §10 — the argument is *magnitude is
-not meaning*, so the interface doesn't lead with colour:
+One page, three views — **Digest** (the ranked "what changed"), **Table** (the
+full watchlist with sparklines, theses and position sizes) and **Discover**
+(trending + browse-by-sector). Design follows spec §10 — the argument is
+*magnitude is not meaning*, so the interface doesn't lead with colour:
 
 - **Hero is the time gap** — "3 days away" as a large numeral, not a logo or a
   ticker grid.
@@ -249,8 +258,9 @@ not meaning*, so the interface doesn't lead with colour:
   remembering a string.
 - **Four cheap charts, hand-rolled SVG, no charting library** (spec addendum —
   deviates from the original Recharts-for-sparklines decision; see
-  `DECISIONS.md` for why). Every headline card, collapsed behind a "show
-  chart" toggle so 5 cards don't turn into a wall of charts:
+  `DECISIONS.md` for why). Three sit on the headline card, collapsed behind a
+  "show chart" toggle so 5 cards don't turn into a wall of charts; the fourth
+  (sparkline) is one per table row:
   - **Absence chart** — the last 60 sessions' price, with the window since you
     last checked shaded. You see the gap you missed, not a number describing it.
   - **Decomposition bar** — the move split into market and company portions,
@@ -260,9 +270,11 @@ not meaning*, so the interface doesn't lead with colour:
   - **Sparkline** in the table, one per row, batched in the same query as
     everything else — no per-row round trip.
 
-`src/components/app/` — `app-shell.tsx` owns data + view state; `digest-view.tsx`,
-`watchlist-table.tsx`, `add-symbol.tsx`, `account-bar.tsx`, `staleness-pill.tsx`,
-`sparkline.tsx`, `absence-chart.tsx`, `decomposition-bar.tsx`, `z-context-strip.tsx`,
+`src/components/app/` — `app-shell.tsx` owns data + view state; `hero.tsx`,
+`digest-view.tsx`, `watchlist-table.tsx`, `discover-view.tsx`,
+`trending-preview.tsx`, `symbol-detail.tsx` (the click-a-name detail modal),
+`add-symbol.tsx`, `account-bar.tsx`, `staleness-pill.tsx`, `sparkline.tsx`,
+`absence-chart.tsx`, `decomposition-bar.tsx`, `z-context-strip.tsx`,
 `data-health-panel.tsx` (collapsed by default — for someone who goes looking,
 not competing with the digest) are presentational. All client-rendered against
 the API above — there's no server-rendered data path yet (a fine trade for a
@@ -323,7 +335,7 @@ prose.
 | Insufficient history | `< 60` sessions → σ₆₀ is invalid → `detectSymbol` returns nothing, rather than firing on noise. Unit tested. |
 | Market holidays & weekends | `nse-calendar.json` is the observed set of ^NSEI sessions, not `weekday ≠ 0/6`. Horizon is counted in sessions, never calendar days. Unit tested. |
 | Very long absence | Horizon `h` clamped to 20 sessions so `√h` doesn't saturate and everything reads as significant. The digest card says "showing the last month" once the cap is hit. |
-| Just-added symbol | No baseline — watermark = `added_at`. The digest is honestly empty for it until the next session; the table row says "watching from today." |
+| Just-added symbol | No baseline for a move *since* you started watching — watermark = `added_at`. Rather than a blank digest, `buildDigest` falls back to a `lookback` set: the events the shared engine already flagged for those names in the last few weeks, labelled "nothing since — here's the recent history." The table row still says "watching from today." |
 | Concurrent devices | Watermark advance is `GREATEST(existing, incoming)`, not last-write-wins — two devices can't rewind each other. |
 | Clock skew | `classifyQuote()` rejects an `exchange_ts` in the future and falls back to `fetched_at`, so a misbehaving clock can't fake a "live" badge. |
 | Duplicate cron runs | Idempotent via the `events.dedupe_key` unique constraint — verified by running `npm run detect` twice and diffing the row count (0 new). |
@@ -336,7 +348,7 @@ prose.
 
 | Case | Handling |
 |---|---|
-| Empty vs. quiet watchlist | Two different messages — "add a symbol" (`no_watchlist`) vs. "quiet, nothing crossed the bar" (`all_quiet`) — never one generic empty state. |
+| Empty vs. quiet watchlist | Three different messages, never one generic empty state — "add a symbol" (`no_watchlist`), "nothing since you started — here's the recent history" (`not_watching_yet`, with a `lookback` set) and "quiet, nothing crossed the bar" (`all_quiet`). |
 | Disputed / stale data | Amber is the palette's *only* use of that colour (spec §10) — always paired with the reason (lag, source, or circuit state), never a bare tint. Staged live: `INFY`'s quote is flagged disputed with an honest note (no live second source is configured). |
 | No database on a fresh deploy | `/` is static and pings `/api/health`, which never throws — a cold Vercel deploy with no `DATABASE_URL` set still renders instead of 500ing. |
 | A second source that's usually unavailable | `getFinnhubQuote()` is a real integration (spec §7) but NSE tickers mostly aren't on Finnhub's free tier — it's written to return `null` gracefully, which is the same "one source" path a missing key takes. Never a hard dependency. |
